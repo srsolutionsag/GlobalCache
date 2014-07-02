@@ -25,7 +25,6 @@ class ilMemcache implements ilGlobalCacheWrapper {
 			$memcached = new Memcached(self::PERSISTENT_ID);
 			$memcached->setOption(Memcached::OPT_CONNECT_TIMEOUT, 1000);
 			$memcached->addServer('127.0.0.1', 11211);
-			$memcached->addServer('131.152.226.20', 11211, 100);
 
 			self::$memcache_object = $memcached;
 			self::$active = $memcached->getStats() !== false;
