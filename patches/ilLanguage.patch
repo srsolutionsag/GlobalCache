@@ -1,0 +1,335 @@
+Index: Services/Language/classes/class.ilLanguage.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- Services/Language/classes/class.ilLanguage.php	(revision 49611)
++++ Services/Language/classes/class.ilLanguage.php	(revision )
+@@ -11,14 +11,14 @@
+  * the constructor is called with a small language abbreviation
+  * e.g. $lng = new Language("en");
+  * the constructor reads the single-languagefile en.lang and puts this into an array.
+- * with 
++ * with
+  * e.g. $lng->txt("user_updated");
+  * you can translate a lang-topic into the actual language
+  *
+  * @author Peter Gabriel <pgabriel@databay.de>
+  * @version $Id: class.ilLanguage.php 33501 2012-03-03 11:11:05Z akill $
+- * 
+- * 
++ *
++ *
+  * @todo Das Datefeld wird bei Aenderungen einer Sprache (update, install, deinstall) nicht richtig gesetzt!!!
+  *  Die Formatfunktionen gehoeren nicht in class.Language. Die sind auch woanders einsetzbar!!!
+  *  Daher->besser in class.Format
+@@ -27,24 +27,24 @@
+ {
+ 	/**
+ 	 * ilias object
+-	 * 
++	 *
+ 	 * @var object Ilias
+ 	 * @access private
+ 	 */
+ 	var $ilias;
+-	
++
+ 	/**
+ 	 * text elements
+-	 * 
++	 *
+ 	 * @var array
+ 	 * @access private
+ 	 */
+ 	var $text;
+-	
++
+ 	/**
+ 	 * indicator for the system language
+ 	 * this language must not be deleted
+-	 * 
++	 *
+ 	 * @var		string
+ 	 * @access	private
+ 	 */
+@@ -54,7 +54,7 @@
+ 	 * language that is in use
+ 	 * by current user
+ 	 * this language must not be deleted
+-	 * 
++	 *
+ 	 * @var		string
+ 	 * @access	private
+ 	 */
+@@ -64,7 +64,7 @@
+ 	 * path to language files
+ 	 * relative path is taken from ini file
+ 	 * and added to absolute path of ilias
+-	 * 
++	 *
+ 	 * @var		string
+ 	 * @access	private
+ 	 */
+@@ -72,7 +72,7 @@
+ 
+ 	/**
+ 	 * language key in use by current user
+-	 * 
++	 *
+ 	 * @var		string	languagecode (two characters), e.g. "de", "en", "in"
+ 	 * @access	private
+ 	 */
+@@ -80,23 +80,23 @@
+ 
+ 	/**
+ 	 * language full name in that language current in use
+-	 * 
++	 *
+ 	 * @var		string
+ 	 * @access	private
+ 	 */
+ 	var $lang_name;
+ 
+ 	/**
+-	 * separator value between module,identivier & value 
+-	 * 
++	 * separator value between module,identivier & value
++	 *
+ 	 * @var		string
+ 	 * @access	private
+ 	 */
+ 	var $separator = "#:#";
+-	
++
+ 	/**
+ 	 * separator value between the content and the comment of the lang entry
+-	 * 
++	 *
+ 	 * @var		string
+ 	 * @access	private
+ 	 */
+@@ -104,7 +104,7 @@
+ 
+ 	/**
+ 	 * array of loaded languages
+-	 * 
++	 *
+ 	 * @var		array
+ 	 * @access	private
+ 	 */
+@@ -115,7 +115,7 @@
+ 	 * read the single-language file and put this in an array text.
+ 	 * the text array is two-dimensional. First dimension is the language.
+ 	 * Second dimension is the languagetopic. Content is the translation.
+-	 * 
++	 *
+ 	 * @access	public
+ 	 * @param	string		languagecode (two characters), e.g. "de", "en", "in"
+ 	 * @return	boolean 	false if reading failed
+@@ -146,9 +146,10 @@
+ 		}
+ 
+ 		$this->lang_key = $a_lang_key;
+-		
++
+ 		$this->text = array();
+ 		$this->loaded_modules = array();
++		$this->loadFromGlobalCache();
+ 		//$this->lang_path = ILIAS_ABSOLUTE_PATH.substr($this->ilias->ini->readVariable("language","path"),1);
+ 
+ 		// if no directory was found fall back to default lang dir
+@@ -164,9 +165,9 @@
+ 			$this->lang_default = $ilSetting->get("language");
+ 		}
+ 		$this->lang_user = $ilUser->prefs["language"];
+-		
++
+ 		$langs = $this->getInstalledLanguages();
+-		
++
+ 		if (!in_array($this->lang_key,$langs))
+ 		{
+ 			$this->lang_key = $this->lang_default;
+@@ -181,17 +182,17 @@
+ 	{
+ 		return $this->lang_key;
+ 	}
+-	
++
+ 	function getDefaultLanguage()
+ 	{
+ 		return $this->lang_default ? $this->lang_default : 'en';
+ 	}
+-	
++
+ 	/**
+ 	 * gets the text for a given topic in a given language
+ 	 * if the topic is not in the list, the topic itself with "-" will be returned
+-	 * 
+-	 * @access	public 
++	 *
++	 * @access	public
+ 	 * @param	string	topic
+ 	 * @param string $a_language The language of the output string
+ 	 * @return	string	text clear-text
+@@ -211,8 +212,8 @@
+ 	/**
+ 	 * gets the text for a given topic
+ 	 * if the topic is not in the list, the topic itself with "-" will be returned
+-	 * 
+-	 * @access	public 
++	 *
++	 * @access	public
+ 	 * @param	string	topic
+ 	 * @return	string	text clear-text
+ 	 */
+@@ -252,17 +253,56 @@
+ 			return $translation;
+ 		}
+ 	}
+-	
++
+ 	/**
+ 	 * Check if language entry exists
+ 	 * @param object $a_topic
+-	 * @return 
++	 * @return
+ 	 */
+ 	public function exists($a_topic)
+ 	{
+ 		return isset($this->text[$a_topic]);
+ 	}
+-	
++
++
++	protected function loadFromGlobalCache() {
++		$lang_key = $this->lang_key;
++		if (empty($this->lang_key)) {
++			$lang_key = $this->lang_user;
++		}
++		require_once('./Services/GlobalCache/classes/class.ilGlobalCache.php');
++		$ilGlobalCache = ilGlobalCache::getInstance();
++		if ($ilGlobalCache->isActive()) {
++			$loaded_modules = $ilGlobalCache->get($lang_key . '_loaded_modules');
++			if (is_array($loaded_modules)) {
++				$this->loaded_modules = $loaded_modules;
++			}
++			$var = $ilGlobalCache->get($lang_key . '_texts');
++			if (is_array($var)) {
++				$this->text = $var;
++			}
++		}
++	}
++
++
++	protected function saveToGlobalCache() {
++		$lang_key = $this->lang_key;
++		if (empty($this->lang_key)) {
++			$lang_key = $this->lang_user;
++		}
++		require_once('./Services/GlobalCache/classes/class.ilGlobalCache.php');
++		$ilGlobalCache = ilGlobalCache::getInstance();
++		if ($ilGlobalCache->isActive()) {
++			if (is_array($this->loaded_modules)) {
++				$ilGlobalCache->set($lang_key . '_loaded_modules', $this->loaded_modules);
++			}
++			if (is_array($this->text)) {
++				$ilGlobalCache->set($lang_key . '_texts', $this->text);
++			}
++		}
++	}
++
++
+ 	function loadLanguageModule ($a_module)
+ 	{
+ 		global $ilDB;
+@@ -301,51 +341,61 @@
+ 				$ilDB->quote($a_module, "text");
+ 		$r = $ilDB->query($q);
+ 		$row = $r->fetchRow(DB_FETCHMODE_ASSOC);
+-		
++
+ 		$new_text = unserialize($row["lang_array"]);
+ 		if (is_array($new_text))
+ 		{
+ 			$this->text = array_merge($this->text, $new_text);
+ 		}
++		$this->saveToGlobalCache();
+ 	}
+-	
+-	
++
++
+ 	function getInstalledLanguages()
+ 	{
+ 		include_once("./Services/Object/classes/class.ilObject.php");
+ 		$langlist = ilObject::_getObjectsByType("lng");
+-		
++
+ 		foreach ($langlist as $lang)
+ 		{
+ 			if (substr($lang["desc"], 0, 9) == "installed")
+ 			{
+ 				$languages[] = $lang["title"];
+ 			}
+-		
++
+ 		}
+ 
+ 		return $languages ? $languages : array();
+ 	}
+-	
++
+ 	function _lookupEntry($a_lang_key, $a_mod, $a_id)
+ 	{
+ 		global $ilDB;
+-		
++
++		if($a_lang_key == $this->lang_key AND in_array($a_id, $this->text)) {
++			return $this->text[$a_id];
++		}
++
++
+ 		$set = $ilDB->query($q = sprintf("SELECT * FROM lng_data WHERE module = %s ".
+ 			"AND lang_key = %s AND identifier = %s",
+ 			$ilDB->quote((string) $a_mod, "text"), $ilDB->quote((string) $a_lang_key, "text"),
+ 			$ilDB->quote((string) $a_id, "text")));
+ 		$rec = $ilDB->fetchAssoc($set);
+-		
++
+ 		if ($rec["value"] != "")
+ 		{
+ 			// remember the used topics
+ 			$this->used_topics[$a_id] = $a_id;
++
++			$this->text[$a_id] = $rec["value"];
++			$this->saveToGlobalCache();
++
+ 			$this->used_modules[$a_mod] = $a_mod;
+-			
++
+ 			return $rec["value"];
+ 		}
+-		
++
+ 		return "-".$a_id."-";
+ 	}
+ 
+@@ -384,7 +434,7 @@
+ 			return array();
+ 		}
+ 	}
+-	
++
+ 	function getUsedModules()
+ 	{
+ 		if (is_array($this->used_modules))
+@@ -403,6 +453,6 @@
+ 		return $this->lang_user;
+ 	}
+ 
+-	
++
+ } // END class.Language
+ ?>
