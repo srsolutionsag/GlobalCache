@@ -13,6 +13,7 @@ require_once('./Services/GlobalCache/classes/Apc/class.ilApc.php');
  */
 class ilGlobalCache implements ilGlobalCacheWrapper {
 
+	const ACTIVE = true;
 	const TYPE_XCACHE = 1;
 	const TYPE_MEMCACHED = 2;
 	const TYPE_SHM = 3;
@@ -42,7 +43,6 @@ class ilGlobalCache implements ilGlobalCacheWrapper {
 	public static function getInstance() {
 		if (! isset(self::$instance)) {
 			$ilGlobalCache = new self(self::TYPE_XCACHE);
-			$ilGlobalCache->setPrefix(substr(md5(ILIAS_HTTP_PATH), 0, 6) . '_');
 			self::$instance = $ilGlobalCache;
 		}
 
@@ -70,6 +70,7 @@ class ilGlobalCache implements ilGlobalCacheWrapper {
 	 * @param $type
 	 */
 	protected function __construct($type) {
+		$this->setPrefix(substr(md5(ILIAS_HTTP_PATH), 0, 6) . '_');
 		switch ($type) {
 			case self::TYPE_MEMCACHED:
 				$this->global_cache = new ilMemcache();
@@ -92,8 +93,7 @@ class ilGlobalCache implements ilGlobalCacheWrapper {
 	 */
 	public function isActive() {
 		$admin_setting = true; // TODO make Settings in Administration
-//		return false;
-		return $this->global_cache->isActive() AND $admin_setting;
+		return ($this->global_cache->isActive() AND $admin_setting AND self::ACTIVE);
 	}
 
 
@@ -168,15 +168,20 @@ class ilGlobalCache implements ilGlobalCacheWrapper {
 
 
 	/**
+	 * @param bool $check_active
+	 *
 	 * @throws RuntimeException
 	 * @return bool
 	 */
-	public function flush() {
-		if (! $this->global_cache->isActive()) {
+	public function flush($check_active = false) {
+		if (! $this->global_cache->isActive() AND $check_active) {
 			throw new RuntimeException(self::MSG);
 		}
+		if ($this->global_cache->isActive()) {
+			return $this->global_cache->flush();
+		}
 
-		return $this->global_cache->flush();
+		return false;
 	}
 
 

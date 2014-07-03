@@ -9,7 +9,7 @@ require_once('./Services/GlobalCache/interfaces/interface.ilGlobalCacheWrapper.p
  */
 class ilMemcache implements ilGlobalCacheWrapper {
 
-	const PERSISTENT_ID = 'ilias_pers_cache2';
+	const PERSISTENT_ID = 'ilias_pers_cache';
 	/**
 	 * @var Memcached
 	 */
