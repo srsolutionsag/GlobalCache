@@ -86,7 +86,7 @@ class ilXcache implements ilGlobalCacheWrapper {
 	 * @return bool
 	 */
 	public function flush() {
-		xcache_clear_cache(- 1);
+		xcache_clear_cache(XC_TYPE_VAR, 0);
 
 		return true;
 	}
