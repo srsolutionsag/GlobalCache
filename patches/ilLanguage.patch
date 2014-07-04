@@ -127,7 +127,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  	 * @access	public
  	 * @param	string		languagecode (two characters), e.g. "de", "en", "in"
  	 * @return	boolean 	false if reading failed
-@@ -146,9 +146,10 @@
+@@ -146,7 +146,7 @@
  		}
  
  		$this->lang_key = $a_lang_key;
@@ -135,11 +135,8 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 +
  		$this->text = array();
  		$this->loaded_modules = array();
-+		$this->loadFromGlobalCache();
  		//$this->lang_path = ILIAS_ABSOLUTE_PATH.substr($this->ilias->ini->readVariable("language","path"),1);
- 
- 		// if no directory was found fall back to default lang dir
-@@ -164,9 +165,9 @@
+@@ -164,9 +164,9 @@
  			$this->lang_default = $ilSetting->get("language");
  		}
  		$this->lang_user = $ilUser->prefs["language"];
@@ -151,7 +148,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  		if (!in_array($this->lang_key,$langs))
  		{
  			$this->lang_key = $this->lang_default;
-@@ -181,17 +182,17 @@
+@@ -181,17 +181,17 @@
  	{
  		return $this->lang_key;
  	}
@@ -173,7 +170,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  	 * @param	string	topic
  	 * @param string $a_language The language of the output string
  	 * @return	string	text clear-text
-@@ -211,8 +212,8 @@
+@@ -211,8 +211,8 @@
  	/**
  	 * gets the text for a given topic
  	 * if the topic is not in the list, the topic itself with "-" will be returned
@@ -184,7 +181,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  	 * @param	string	topic
  	 * @return	string	text clear-text
  	 */
-@@ -252,17 +253,56 @@
+@@ -252,21 +252,67 @@
  			return $translation;
  		}
  	}
@@ -211,13 +208,19 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 +		require_once('./Services/GlobalCache/classes/class.ilGlobalCache.php');
 +		$ilGlobalCache = ilGlobalCache::getInstance();
 +		if ($ilGlobalCache->isActive()) {
-+			$loaded_modules = $ilGlobalCache->get($lang_key . '_loaded_modules');
-+			if (is_array($loaded_modules)) {
-+				$this->loaded_modules = $loaded_modules;
++			if (! $this->loaded) {
++				$loaded_modules = $ilGlobalCache->get($lang_key . '_loaded_modules');
++				if (is_array($loaded_modules)) {
++					$this->loaded_modules = $loaded_modules;
++					$this->loaded = true;
++				}
 +			}
-+			$var = $ilGlobalCache->get($lang_key . '_texts');
-+			if (is_array($var)) {
-+				$this->text = $var;
++			if (! $this->loaded_text) {
++				$var = $ilGlobalCache->get($lang_key . '_texts');
++				if (is_array($var)) {
++					$this->text = $var;
++					$this->loaded_text = true;
++				}
 +			}
 +		}
 +	}
@@ -235,6 +238,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 +				$ilGlobalCache->set($lang_key . '_loaded_modules', $this->loaded_modules);
 +			}
 +			if (is_array($this->text)) {
++				$this->loaded_text = false;
 +				$ilGlobalCache->set($lang_key . '_texts', $this->text);
 +			}
 +		}
@@ -244,7 +248,12 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  	function loadLanguageModule ($a_module)
  	{
  		global $ilDB;
-@@ -301,51 +341,61 @@
+-
++		$this->loadFromGlobalCache();
+ 		if (in_array($a_module, $this->loaded_modules))
+ 		{
+ 			return;
+@@ -301,51 +347,52 @@
  				$ilDB->quote($a_module, "text");
  		$r = $ilDB->query($q);
  		$row = $r->fetchRow(DB_FETCHMODE_ASSOC);
@@ -286,11 +295,6 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  		global $ilDB;
 -		
 +
-+		if($a_lang_key == $this->lang_key AND in_array($a_id, $this->text)) {
-+			return $this->text[$a_id];
-+		}
-+
-+
  		$set = $ilDB->query($q = sprintf("SELECT * FROM lng_data WHERE module = %s ".
  			"AND lang_key = %s AND identifier = %s",
  			$ilDB->quote((string) $a_mod, "text"), $ilDB->quote((string) $a_lang_key, "text"),
@@ -302,10 +306,6 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  		{
  			// remember the used topics
  			$this->used_topics[$a_id] = $a_id;
-+
-+			$this->text[$a_id] = $rec["value"];
-+			$this->saveToGlobalCache();
-+
  			$this->used_modules[$a_mod] = $a_mod;
 -			
 +
@@ -316,7 +316,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  		return "-".$a_id."-";
  	}
  
-@@ -384,7 +434,7 @@
+@@ -384,7 +431,7 @@
  			return array();
  		}
  	}
@@ -325,7 +325,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  	function getUsedModules()
  	{
  		if (is_array($this->used_modules))
-@@ -403,6 +453,6 @@
+@@ -403,6 +450,6 @@
  		return $this->lang_user;
  	}
  
