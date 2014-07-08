@@ -1,0 +1,70 @@
+Index: Services/Administration/classes/class.ilSetting.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- Services/Administration/classes/class.ilSetting.php	(revision 51229)
++++ Services/Administration/classes/class.ilSetting.php	(revision )
+@@ -20,14 +20,14 @@
+ 	| Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA. |
+ 	+-----------------------------------------------------------------------------+
+ */
++require_once('./Services/GlobalCache/classes/class.ilGlobalCache.php');
+ 
+-
+ /**
+ * ILIAS Setting Class
+ *
+ * @author Alex Killing <alex.killing@databay.de>
+ 
+-* @version $Id: class.ilSetting.php 46023 2014-07-07 19:45:05Z smeyer $
++* @version $Id: class.ilSetting.php 46023 2013-11-05 15:33:10Z smeyer $
+ */
+ class ilSetting
+ {
+@@ -73,14 +73,34 @@
+ 	{
+ 		return $this->module;
+ 	}
+-		
++
++
++	protected function loadFromGlobalCache() {
++		$ilGlobalCache = ilGlobalCache::getInstance();
++
++		if($ilGlobalCache->isActive()) {
++			if($module = $ilGlobalCache->get('settings_'.$this->module)) {
++				self::$settings_cache[$this->module] = $module;
++			}
++		}
++	}
++
++
++	protected function saveToGlobalCache() {
++		$ilGlobalCache = ilGlobalCache::getInstance();
++
++		if($ilGlobalCache->isActive()) {
++			$ilGlobalCache->set('settings_'.$this->module, self::$settings_cache[$this->module]);
++		}
++	}
++		
+ 	/**
+ 	* Read settings data
+ 	*/
+ 	function read()
+ 	{
+ 		global $ilDB;
+-		
++		$this->loadFromGlobalCache();
+ 		// get the settings from the cache if they exist.
+ 		// The setting array of the class is a reference to the cache.
+ 		// So changing settings in one instance will change them in all.
+@@ -106,7 +126,7 @@
+ 		{
+ 			$this->setting[$row["keyword"]] = $row["value"];
+ 		}
+-
++		$this->saveToGlobalCache();
+ 	}
+ 	
+ 	/**

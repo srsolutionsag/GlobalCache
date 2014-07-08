@@ -1,0 +1,46 @@
+Index: Services/Object/classes/class.ilObjectDefinition.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- Services/Object/classes/class.ilObjectDefinition.php	(revision 51229)
++++ Services/Object/classes/class.ilObjectDefinition.php	(revision )
+@@ -7,7 +7,7 @@
+ * it handles the xml-description of all ilias objects
+ *
+ * @author Alex Killing <alex.killing@gmx.de>
+-* @version $Id: class.ilObjectDefinition.php 46220 2014-07-07 21:10:31Z akill $
++* @version $Id: class.ilObjectDefinition.php 46220 2013-11-14 20:35:27Z akill $
+ *
+ * @externalTableAccess ilObjDefReader on il_object_def, il_object_subobj, il_object_group 
+ */
+@@ -82,7 +82,16 @@
+ 	function readDefinitionData()
+ 	{
+ 		global $ilDB, $ilPluginAdmin;
++		require_once('./Services/GlobalCache/classes/class.ilGlobalCache.php');
++		$ilGlobalCache = ilGlobalCache::getInstance();
++		if ($ilGlobalCache->isActive()) {
++			if ($object_def_cache = $ilGlobalCache->get('object_definition')) {
++				$this->obj_data = $object_def_cache;
++				$this->sub_types = $ilGlobalCache->get('object_definition_subtypes');
+-		
++
++				return true;
++			}
++		}
+ 		$this->obj_data = array();
+ 		
+ 
+@@ -194,7 +203,10 @@
+ 		{
+ 			$this->sub_types[$rec["obj_type"]][] = $rec;
+ 		}
+-
++		if($ilGlobalCache->isActive()) {
++			$ilGlobalCache->set('object_definition', $this->obj_data);
++			$ilGlobalCache->set('object_definition_subtypes', $this->sub_types);
++		}
+ 	}
+ 	
+ 	
