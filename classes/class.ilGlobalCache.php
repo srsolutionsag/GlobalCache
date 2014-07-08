@@ -42,7 +42,7 @@ class ilGlobalCache implements ilGlobalCacheWrapper {
 	 */
 	public static function getInstance() {
 		if (! isset(self::$instance)) {
-			$ilGlobalCache = new self(self::TYPE_XCACHE);
+			$ilGlobalCache = new self(self::TYPE_APC);
 			self::$instance = $ilGlobalCache;
 		}
 
