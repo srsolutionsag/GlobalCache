@@ -93,7 +93,11 @@ class ilGlobalCache implements ilGlobalCacheWrapper {
 	 */
 	public function isActive() {
 		$admin_setting = true; // TODO make Settings in Administration
-		return ($this->global_cache->isActive() AND $admin_setting AND self::ACTIVE);
+		if (! self::ACTIVE) {
+			return false;
+		}
+
+		return ($this->global_cache->isActive() AND $admin_setting);
 	}
 
 
