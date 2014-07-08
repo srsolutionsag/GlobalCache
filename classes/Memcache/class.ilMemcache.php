@@ -23,11 +23,12 @@ class ilMemcache implements ilGlobalCacheWrapper {
 	public function __construct() {
 		if (! (self::$memcache_object instanceof Memcached)) {
 			$memcached = new Memcached(self::PERSISTENT_ID);
-			$memcached->setOption(Memcached::OPT_CONNECT_TIMEOUT, 1000);
+			//$memcached->setOption(Memcached::OPT_CONNECT_TIMEOUT, 10);
 			$memcached->addServer('127.0.0.1', 11211);
-
+			// var_dump($memcached->getStats()); // FSX
 			self::$memcache_object = $memcached;
-			self::$active = $memcached->getStats() !== false;
+			$stats = $memcached->getStats();
+			self::$active = $stats['127.0.0.1:11211']['pid'] > 0;
 		}
 	}
 
