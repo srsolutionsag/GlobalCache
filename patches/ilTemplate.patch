@@ -1,0 +1,91 @@
+Index: Services/UICore/classes/class.ilTemplate.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- Services/UICore/classes/class.ilTemplate.php	(revision 51229)
++++ Services/UICore/classes/class.ilTemplate.php	(revision )
+@@ -6,7 +6,7 @@
+ * special template class to simplify handling of ITX/PEAR
+ * @author	Stefan Kesseler <skesseler@databay.de>
+ * @author	Sascha Hofmann <shofmann@databay.de>
+-* @version	$Id: class.ilTemplate.php 49006 2014-07-08 12:35:59Z jluetzen $
++* @version	$Id: class.ilTemplate.php 49006 2014-03-26 12:08:32Z jluetzen $
+ */
+ class ilTemplate extends ilTemplateX
+ {
+@@ -56,7 +56,34 @@
+ 	protected $header_action;
+ 	protected $lightbox = array();
+
++
++	protected function loadFromGlobalCache() {
++		require_once('./Services/GlobalCache/classes/class.ilGlobalCache.php');
++		$ilGlobalCache = ilGlobalCache::getInstance('tpl');
++		if($ilGlobalCache->isActive()) {
+-	/**
++			/**
++			 * @var $tplObj ilTemplate
++			 */
++			if($tplObj = $ilGlobalCache->get($this->il_cur_key)) {
++				foreach (get_class_vars('ilTemplate') as $key => $value) {
++					$this->{$key} = $tplObj->{$key};
++				}
++				$this->loaded_from_global_cache = true;
++			}
++
++		}
++	}
++
++
++	protected function saveToGlobalCache() {
++		require_once('./Services/GlobalCache/classes/class.ilGlobalCache.php');
++		$ilGlobalCache = ilGlobalCache::getInstance('tpl');
++		if($ilGlobalCache->isActive()) {
++			$ilGlobalCache->set($this->il_cur_key, $this);
++		}
++	}
++
++	/**
+ 	* constructor
+ 	* @param	string	$file 		templatefile (mit oder ohne pfad)
+ 	* @param	boolean	$flag1 		remove unknown variables
+@@ -70,14 +97,18 @@
+ 	{
+ 		global $ilias;
+ //echo "<br>-".$file."-";
+-
+ 		$this->activeBlock = "__global__";
+ 		$this->vars = array();
+ 		$this->addFooter = TRUE;
+-
++
+ 		$this->il_use_cache = $a_use_cache;
+ 		$this->il_cur_key = $file."/".$in_module;
++		$this->loadFromGlobalCache();
++		if($this->loaded_from_global_cache) {
++			return true;
++		}
+
++
+ 		$fname = $this->getTemplatePath($file, $in_module, $plugin);
+
+ 		$this->tplName = basename($fname);
+@@ -106,7 +137,7 @@
+ 			$this->setOption('use_preg', false);
+ 		}
+ 		$this->setBodyClass("std");
+-
++		$this->saveToGlobalCache();
+ 		return true;
+ 	}
+
+@@ -1394,6 +1425,7 @@
+                                $removeUnknownVariables = true,
+                                $removeEmptyBlocks = true )
+     {
++
+     	// copied from IT:loadTemplateFile
+         $template = '';
+         if (!$this->flagCacheTemplatefile ||
+\ No newline at end of file

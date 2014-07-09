@@ -9,7 +9,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  * it handles the xml-description of all ilias objects
  *
  * @author Alex Killing <alex.killing@gmx.de>
--* @version $Id: class.ilObjectDefinition.php 46220 2014-07-07 21:10:31Z akill $
+-* @version $Id: class.ilObjectDefinition.php 46220 2014-07-08 12:51:18Z akill $
 +* @version $Id: class.ilObjectDefinition.php 46220 2013-11-14 20:35:27Z akill $
  *
  * @externalTableAccess ilObjDefReader on il_object_def, il_object_subobj, il_object_group 
@@ -19,11 +19,11 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  	{
  		global $ilDB, $ilPluginAdmin;
 +		require_once('./Services/GlobalCache/classes/class.ilGlobalCache.php');
-+		$ilGlobalCache = ilGlobalCache::getInstance();
++		$ilGlobalCache = ilGlobalCache::getInstance('obj_def');
 +		if ($ilGlobalCache->isActive()) {
-+			if ($object_def_cache = $ilGlobalCache->get('object_definition')) {
++			if ($object_def_cache = $ilGlobalCache->get('types')) {
 +				$this->obj_data = $object_def_cache;
-+				$this->sub_types = $ilGlobalCache->get('object_definition_subtypes');
++				$this->sub_types = $ilGlobalCache->get('subtypes');
 -		
 +
 +				return true;
@@ -32,15 +32,47 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  		$this->obj_data = array();
  		
  
-@@ -194,7 +203,10 @@
+@@ -194,8 +203,11 @@
  		{
  			$this->sub_types[$rec["obj_type"]][] = $rec;
  		}
 -
 +		if($ilGlobalCache->isActive()) {
-+			$ilGlobalCache->set('object_definition', $this->obj_data);
-+			$ilGlobalCache->set('object_definition_subtypes', $this->sub_types);
++			$ilGlobalCache->set('types', $this->obj_data);
++			$ilGlobalCache->set('subtypes', $this->sub_types);
+-	}
 +		}
++	}
+ 	
+ 	
+ // PUBLIC METHODS
+@@ -855,7 +867,15 @@
+ 	static function getGroupedRepositoryObjectTypes($a_parent_obj_type)
+ 	{
+ 		global $ilDB, $ilPluginAdmin;
++		require_once('./Services/GlobalCache/classes/class.ilGlobalCache.php');
++		$ilGlobalCache = ilGlobalCache::getInstance('obj_def');
++		if (! is_array($a_parent_obj_type) AND $ilGlobalCache->isActive()) {
++			if ($existing = $ilGlobalCache->get('grpd_rep_type_' . $a_parent_obj_type)) {
++				return $existing;
++			}
++		}
+-		
++
++
+ 		$set = $ilDB->query("SELECT * FROM il_object_group");
+ 		$groups = array();
+ 		while ($gr_rec = $set->fetchRow(DB_FETCHMODE_ASSOC))
+@@ -913,6 +933,12 @@
+ 
+ 		$ret = ilUtil::sortArray($grouped_obj, "pos", "asc", true, true);
+ //var_dump($ret);
++		//echo '<pre>' . print_r($a_parent_obj_type, 1) . '</pre>';
++		//echo '<pre>' . print_r($ret, 1) . '</pre>';
++		if (! is_array($a_parent_obj_type) AND $ilGlobalCache->isActive()) {
++			$ilGlobalCache->set('grpd_rep_type_' . $a_parent_obj_type, $ret);
++		}
++
+ 		return $ret;
  	}
- 	
- 	
+ 

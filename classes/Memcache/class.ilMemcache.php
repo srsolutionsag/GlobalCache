@@ -1,5 +1,6 @@
 <?php
-require_once('./Services/GlobalCache/interfaces/interface.ilGlobalCacheWrapper.php');
+
+require_once('./Services/GlobalCache/classes/class.ilGlobalCacheService.php');
 
 /**
  * Class ilMemcache
@@ -7,29 +8,28 @@ require_once('./Services/GlobalCache/interfaces/interface.ilGlobalCacheWrapper.p
  * @author  Fabian Schmid <fs@studer-raimann.ch>
  * @version 1.0.0
  */
-class ilMemcache implements ilGlobalCacheWrapper {
+class ilMemcache extends ilGlobalCacheService {
 
-	const PERSISTENT_ID = 'ilias_pers_cache';
+	const STD_SERVER = '127.0.0.1';
+	const STD_PORT = 11211;
 	/**
 	 * @var Memcached
 	 */
 	protected static $memcache_object;
+
+
 	/**
-	 * @var bool
+	 * @param $service_id
+	 * @param $component
 	 */
-	protected static $active = false;
-
-
-	public function __construct() {
+	public function __construct($service_id, $component) {
 		if (! (self::$memcache_object instanceof Memcached)) {
-			$memcached = new Memcached(self::PERSISTENT_ID);
-			//$memcached->setOption(Memcached::OPT_CONNECT_TIMEOUT, 10);
-			$memcached->addServer('127.0.0.1', 11211);
-			// var_dump($memcached->getStats()); // FSX
+			$memcached = new Memcached();
+			// $memcached->setOption(Memcached::OPT_CONNECT_TIMEOUT, 10);
+			$memcached->addServer(self::STD_SERVER, self::STD_PORT);
 			self::$memcache_object = $memcached;
-			$stats = $memcached->getStats();
-			self::$active = $stats['127.0.0.1:11211']['pid'] > 0;
 		}
+		parent::__construct($service_id, $component);
 	}
 
 
@@ -42,40 +42,24 @@ class ilMemcache implements ilGlobalCacheWrapper {
 
 
 	/**
-	 * @return bool
-	 */
-	public function isActive() {
-		return self::$active;
-	}
-
-
-	/**
-	 * @return bool
-	 */
-	public function isInstallable() {
-		return class_exists('Memcached');
-	}
-
-
-	/**
 	 * @param $key
 	 *
 	 * @return bool
 	 */
 	public function exists($key) {
-		return $this->getMemcacheObject()->get($key) != NULL;
+		return $this->getMemcacheObject()->get($this->returnKey($key)) != NULL;
 	}
 
 
 	/**
 	 * @param      $key
-	 * @param      $value
+	 * @param      $serialized_value
 	 * @param null $ttl
 	 *
 	 * @return bool
 	 */
-	public function set($key, $value, $ttl = NULL) {
-		return $this->getMemcacheObject()->set($key, $value, $ttl);
+	public function set($key, $serialized_value, $ttl = NULL) {
+		return $this->getMemcacheObject()->set($this->returnKey($key), $serialized_value, $ttl);
 	}
 
 
@@ -85,7 +69,7 @@ class ilMemcache implements ilGlobalCacheWrapper {
 	 * @return mixed
 	 */
 	public function get($key) {
-		return $this->getMemcacheObject()->get($key);
+		return $this->getMemcacheObject()->get($this->returnKey($key));
 	}
 
 
@@ -95,7 +79,7 @@ class ilMemcache implements ilGlobalCacheWrapper {
 	 * @return bool
 	 */
 	public function delete($key) {
-		return $this->getMemcacheObject()->delete($key);
+		return $this->getMemcacheObject()->delete($this->returnKey($key));
 	}
 
 
@@ -104,6 +88,49 @@ class ilMemcache implements ilGlobalCacheWrapper {
 	 */
 	public function flush() {
 		return $this->getMemcacheObject()->flush();
+	}
+
+
+	/**
+	 * @return bool
+	 */
+	protected function getActive() {
+		$stats = $this->getMemcacheObject()->getStats();
+
+		return $stats[self::STD_SERVER . ':' . self::STD_PORT]['pid'] > 0;
+	}
+
+
+	/**
+	 * @return bool
+	 */
+	protected function getInstallable() {
+		return class_exists('Memcached');
+	}
+
+
+	/**
+	 * @param $value
+	 *
+	 * @return mixed
+	 */
+	public function serialize($value) {
+		return ($value);
+	}
+
+
+	/**
+	 * @param $serialized_value
+	 *
+	 * @return mixed
+	 */
+	public function unserialize($serialized_value) {
+		return ($serialized_value);
+	}
+
+
+	public function getInfo() {
+		return $this->getMemcacheObject()->getAllKeys();
 	}
 }
 
