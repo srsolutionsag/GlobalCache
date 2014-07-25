@@ -130,7 +130,9 @@ class ilMemcache extends ilGlobalCacheService {
 
 
 	public function getInfo() {
-		return $this->getMemcacheObject()->getAllKeys();
+		echo '<pre>' . print_r($this->getMemcacheObject()->getStats(), 1) . '</pre>';
+
+		//return $this->getMemcacheObject()->getAllKeys();
 	}
 }
 

@@ -13,35 +13,72 @@ require_once('./Services/GlobalCache/classes/Static/class.ilStaticCache.php');
  */
 class ilGlobalCache {
 
+	const MSG = 'Global Cache not active, can not access cache';
 	const ACTIVE = true;
 	const TYPE_STATIC = - 1;
 	const TYPE_XCACHE = 1;
 	const TYPE_MEMCACHED = 2;
 	const TYPE_SHM = 3;
 	const TYPE_APC = 4;
-	const TYPE_FALLBACK = self::TYPE_APC;
-	const MSG = 'Global Cache not active, can not access cache';
+	const TYPE_FALLBACK = self::TYPE_STATIC;
+	const COMP_LNG = 'lng';
+	const COMP_OBJ_DEF = 'obj_def';
+	const COMP_SETTINGS = 'set';
+	const COMP_TEMPLATE = 'tpl';
+	const COMP_ILCTRL = 'ilctrl';
+	const COMP_PLUGINS = 'plugins';
+	const COMP_PLUGINSLOTS = 'pluginslots';
+	const COMP_COMPONENT = 'comp';
+	const COMP_RBAC_UA = 'rbac_ua';
 	/**
 	 * @var array
 	 */
-	protected static $types = array( self::TYPE_MEMCACHED, self::TYPE_XCACHE, self::TYPE_SHM, self::TYPE_APC );
+	protected static $types = array( self::TYPE_MEMCACHED, self::TYPE_XCACHE, self::TYPE_SHM, self::TYPE_APC, self::TYPE_STATIC );
 	/**
 	 * @var array
 	 */
 	protected static $registred_components = array(
-		'lng',
-		'obj_def',
-		'set',
-		'tpl',
+		self::COMP_LNG,
+		self::COMP_OBJ_DEF,
+		self::COMP_SETTINGS,
+		self::COMP_TEMPLATE,
+		self::COMP_ILCTRL,
+		self::COMP_PLUGINS,
+		self::COMP_PLUGINSLOTS,
+		self::COMP_COMPONENT,
+		self::COMP_RBAC_UA,
+//		'ctrl_mm',
 	);
 	/**
 	 * @var array
 	 */
 	protected static $registred_types = array(
-		'lng' => self::TYPE_APC,
-		'obj_def' => self::TYPE_APC,
-		'set' => self::TYPE_APC,
-		'tpl' => self::TYPE_APC,
+		self::COMP_LNG => self::TYPE_APC,
+		self::COMP_OBJ_DEF => self::TYPE_APC,
+		self::COMP_SETTINGS => self::TYPE_APC,
+		self::COMP_TEMPLATE => self::TYPE_APC,
+		self::COMP_ILCTRL => self::TYPE_APC,
+		self::COMP_PLUGINS => self::TYPE_APC,
+		self::COMP_PLUGINSLOTS => self::TYPE_APC,
+		self::COMP_COMPONENT => self::TYPE_APC,
+		self::COMP_RBAC_UA => self::TYPE_APC,
+//		'ctrl_mm' => self::TYPE_APC,
+	);
+	/**
+	 * @var array
+	 */
+	protected static $active_types = array(
+		self::COMP_LNG,
+		self::COMP_OBJ_DEF,
+		self::COMP_SETTINGS,
+		self::COMP_TEMPLATE,
+		self::COMP_ILCTRL,
+		self::COMP_PLUGINS,
+		self::COMP_COMPONENT,
+		self::COMP_RBAC_UA,
+		self::COMP_PLUGINSLOTS,
+		//		'ctrl_mm',
+
 	);
 	/**
 	 * @var ilGlobalCache
@@ -59,6 +96,10 @@ class ilGlobalCache {
 	 * @var string
 	 */
 	protected $component;
+	/**
+	 * @var bool
+	 */
+	protected $active = false;
 
 
 	/**
@@ -112,7 +153,9 @@ class ilGlobalCache {
 	 */
 	protected function __construct($type, $component = NULL) {
 		$this->setComponent($component);
-		$this->setServiceid(substr(md5('global_cache'), 0, 6));
+		$service_id = substr($shm_key = ftok(__FILE__, 't'), 0, 6);
+		$this->setServiceid($service_id);
+		$this->setActive(in_array($component, self::$active_types));
 		switch ($type) {
 			case self::TYPE_APC:
 				$this->global_cache = new ilApc($this->getServiceid(), $this->getComponent());
@@ -137,12 +180,14 @@ class ilGlobalCache {
 	 * @return bool
 	 */
 	public function isActive() {
-		$admin_setting = true; // TODO make Settings in Administration
 		if (! self::ACTIVE) {
 			return false;
 		}
+		if (! $this->getActive()) {
+			return false;
+		}
 
-		return ($this->global_cache->isActive() AND $admin_setting);
+		return $this->global_cache->isActive();
 	}
 
 
@@ -178,8 +223,10 @@ class ilGlobalCache {
 	 * @return bool
 	 */
 	public function set($key, $value, $ttl = NULL) {
-		if (! $this->global_cache->isActive()) {
-			throw new RuntimeException(self::MSG);
+		if (! $this->isActive()) {
+
+			return false;
+			//throw new RuntimeException(self::MSG . '. Key: ' . $key);
 		}
 		$this->global_cache->setValid($key);
 
@@ -194,8 +241,10 @@ class ilGlobalCache {
 	 * @return mixed
 	 */
 	public function get($key) {
-		if (! $this->global_cache->isActive()) {
-			throw new RuntimeException(self::MSG);
+		if (! $this->isActive()) {
+			return false;
+
+			throw new RuntimeException(self::MSG . '. get Key: ' . $key);
 		}
 		$unserialized_return = $this->global_cache->unserialize($this->global_cache->get($key));
 		if ($unserialized_return) {
@@ -215,11 +264,11 @@ class ilGlobalCache {
 	 * @return bool
 	 */
 	public function delete($key) {
-		if (! $this->global_cache->isActive()) {
+		if (! $this->isActive()) {
+
+			return false;
 			throw new RuntimeException(self::MSG);
 		}
-
-		// $this->global_cache->setInvalid($key);
 
 		return $this->global_cache->delete($key);
 	}
@@ -232,14 +281,11 @@ class ilGlobalCache {
 	 * @throws RuntimeException
 	 */
 	public function flush($complete = false) {
-		if (! $this->global_cache->isActive()) {
-			// throw new RuntimeException(self::MSG);
-		}
 		if ($this->global_cache->isActive()) {
 			if ($complete) {
 				return $this->global_cache->flush();
 			} else {
-				return $this->global_cache->setInvalid();
+				$this->global_cache->setInvalid();
 			}
 		}
 
@@ -253,10 +299,10 @@ class ilGlobalCache {
 
 
 	/**
-	 * @param string $prefix
+	 * @param string $service_id
 	 */
-	public function setServiceid($prefix) {
-		$this->service_id = $prefix;
+	public function setServiceid($service_id) {
+		$this->service_id = $service_id;
 	}
 
 
@@ -281,6 +327,22 @@ class ilGlobalCache {
 	 */
 	public function getComponent() {
 		return $this->component;
+	}
+
+
+	/**
+	 * @param boolean $active
+	 */
+	public function setActive($active) {
+		$this->active = $active;
+	}
+
+
+	/**
+	 * @return boolean
+	 */
+	public function getActive() {
+		return $this->active;
 	}
 }
 

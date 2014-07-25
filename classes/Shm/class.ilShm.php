@@ -69,7 +69,7 @@ class ilShm extends ilGlobalCacheService {
 	 * @return bool
 	 */
 	public function set($key, $serialized_value, $ttl = NULL) {
-		return shm_put_var(self::$ressource, $key, serialize($serialized_value));
+		return shm_put_var(self::$ressource, $key, $serialized_value);
 	}
 
 
@@ -79,7 +79,7 @@ class ilShm extends ilGlobalCacheService {
 	 * @return mixed
 	 */
 	public function get($key) {
-		return unserialize(shm_get_var(self::$ressource, $key));
+		return shm_get_var(self::$ressource, $key);
 	}
 
 

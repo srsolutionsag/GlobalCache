@@ -12,6 +12,9 @@ require_once('./Services/GlobalCache/classes/class.ilGlobalCacheService.php');
  */
 class ilApc extends ilGlobalCacheService {
 
+	const CACHE_ID = 'user';
+
+
 	/**
 	 * @param $key
 	 *
@@ -30,7 +33,11 @@ class ilApc extends ilGlobalCacheService {
 	 * @return array|bool
 	 */
 	public function set($key, $serialized_value, $ttl = NULL) {
-		return apc_store($this->returnKey($key), $serialized_value, $ttl);
+		if ($this->exists($key)) {
+			return apc_store($this->returnKey($key), $serialized_value, $ttl);
+		} else {
+			return apc_add($this->returnKey($key), $serialized_value, $ttl);
+		}
 	}
 
 
@@ -58,7 +65,7 @@ class ilApc extends ilGlobalCacheService {
 	 * @return bool
 	 */
 	public function flush() {
-		return apc_clear_cache('user');
+		return apc_clear_cache(self::CACHE_ID);
 	}
 
 
@@ -68,7 +75,7 @@ class ilApc extends ilGlobalCacheService {
 	 * @return mixed|string
 	 */
 	public function serialize($value) {
-		return $value;
+		return serialize($value);
 	}
 
 
@@ -78,7 +85,7 @@ class ilApc extends ilGlobalCacheService {
 	 * @return mixed
 	 */
 	public function unserialize($serialized_value) {
-		return $serialized_value;
+		return unserialize($serialized_value);
 	}
 
 
@@ -86,12 +93,14 @@ class ilApc extends ilGlobalCacheService {
 	 * @return array
 	 */
 	public function getInfo() {
-		$iter = new APCIterator('user');
+		$iter = new APCIterator(self::CACHE_ID);
 		$return = array();
-		$match = "/" . $this->getServiceId() . "_" . $this->getComponent() . "_([a-zA-Z0-9_.]*)/uism";
+		$match = "/" . $this->getServiceId() . "_" . $this->getComponent() . "_([_.a-zA-Z0-9]*)/uism";
 		foreach ($iter as $item) {
 			$key = $item['key'];
+//						echo '<pre>' . print_r($key, 1) . '</pre>';
 			if (preg_match($match, $key, $matches)) {
+//				echo '<pre>' . print_r($matches, 1) . '</pre>';
 				if ($matches[1]) {
 					if ($this->isValid($matches[1])) {
 						$return[$matches[1]] = $this->unserialize($item['value']);

@@ -1,0 +1,36 @@
+Index: Services/Component/classes/class.ilPluginSlot.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- Services/Component/classes/class.ilPluginSlot.php	(revision 51315)
++++ Services/Component/classes/class.ilPluginSlot.php	(revision )
+@@ -39,6 +39,17 @@
+ 	*/
+ 	function read()
+ 	{
++		// FSX memcached
++		require_once('./Services/GlobalCache/classes/class.ilGlobalCache.php');
++		$ilGlobalCache = ilGlobalCache::getInstance(ilGlobalCache::COMP_PLUGINSLOTS);
++		if($ilGlobalCache->isActive()) {
++			$key = $this->getComponentType() . $this->getComponentName() . $this->getSlotId();
++			if($existing = $ilGlobalCache->get($key)) {
++				$this->setSlotName($existing);
++				return;
++			}
++		}
++
+ 		global $ilDB;
+
+ 		$q = "SELECT * FROM il_pluginslot WHERE component = ".
+@@ -47,6 +58,10 @@
+ 		$set = $ilDB->query($q);
+ 		$rec = $ilDB->fetchAssoc($set);
+ 		$this->setSlotName($rec["name"]);
++
++		if($ilGlobalCache->isActive()) {
++			$ilGlobalCache->set($key, $rec["name"]);
++		}
+ 	}
+
+ 	/**
