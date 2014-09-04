@@ -26,18 +26,14 @@ class ilApc extends ilGlobalCacheService {
 
 
 	/**
-	 * @param      $key
-	 * @param      $serialized_value
-	 * @param null $ttl
+	 * @param     $key
+	 * @param     $serialized_value
+	 * @param int $ttl
 	 *
 	 * @return array|bool
 	 */
-	public function set($key, $serialized_value, $ttl = NULL) {
-		if ($this->exists($key)) {
-			return apc_store($this->returnKey($key), $serialized_value, $ttl);
-		} else {
-			return apc_add($this->returnKey($key), $serialized_value, $ttl);
-		}
+	public function set($key, $serialized_value, $ttl = 0) {
+		return apc_store($this->returnKey($key), $serialized_value, $ttl);
 	}
 
 
@@ -93,14 +89,23 @@ class ilApc extends ilGlobalCacheService {
 	 * @return array
 	 */
 	public function getInfo() {
-		$iter = new APCIterator(self::CACHE_ID);
 		$return = array();
+		ini_set('apc.shm_size', '128M');
+		$return['__cache_info'] = array(
+			'apc.enabled' => ini_get('apc.enabled'),
+			'apc.shm_size' => ini_get('apc.shm_size'),
+			'apc.shm_segments' => ini_get('apc.shm_segments'),
+			'apc.gc_ttl' => ini_get('apc.gc_ttl'),
+			'apc.ttl' => ini_get('apc.ttl'),
+		);
+
+		$iter = new APCIterator(self::CACHE_ID);
 		$match = "/" . $this->getServiceId() . "_" . $this->getComponent() . "_([_.a-zA-Z0-9]*)/uism";
 		foreach ($iter as $item) {
 			$key = $item['key'];
-//						echo '<pre>' . print_r($key, 1) . '</pre>';
+			//echo '<pre>' . print_r($key, 1) . '</pre>';
 			if (preg_match($match, $key, $matches)) {
-//				echo '<pre>' . print_r($matches, 1) . '</pre>';
+				//				echo '<pre>' . print_r($matches, 1) . '</pre>';
 				if ($matches[1]) {
 					if ($this->isValid($matches[1])) {
 						$return[$matches[1]] = $this->unserialize($item['value']);
@@ -119,7 +124,7 @@ class ilApc extends ilGlobalCacheService {
 
 
 	/**
-	 * @description set self::$installable
+	 * @return bool
 	 */
 	protected function getInstallable() {
 		return function_exists('apc_store');

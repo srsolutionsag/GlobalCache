@@ -29,7 +29,7 @@ class ilMemcache extends ilGlobalCacheService {
 	 * @param $component
 	 */
 	public function __construct($service_id, $component) {
-		if (! (self::$memcache_object instanceof Memcached)) {
+		if (! (self::$memcache_object instanceof Memcached) AND $this->getInstallable()) {
 			$memcached = new Memcached();
 			foreach (self::$servers as $host => $port) {
 				$memcached->addServer($host, $port);
@@ -102,9 +102,11 @@ class ilMemcache extends ilGlobalCacheService {
 	 * @return bool
 	 */
 	protected function getActive() {
-		$stats = $this->getMemcacheObject()->getStats();
+		if ($this->getInstallable()) {
+			$stats = $this->getMemcacheObject()->getStats();
 
-		return $stats[self::STD_SERVER . ':' . self::STD_PORT]['pid'] > 0;
+			return $stats[self::STD_SERVER . ':' . self::STD_PORT]['pid'] > 0;
+		}
 	}
 
 
@@ -112,7 +114,6 @@ class ilMemcache extends ilGlobalCacheService {
 	 * @return bool
 	 */
 	protected function getInstallable() {
-		return false;
 		return class_exists('Memcached');
 	}
 
@@ -123,7 +124,7 @@ class ilMemcache extends ilGlobalCacheService {
 	 * @return mixed
 	 */
 	public function serialize($value) {
-		return ($value);
+		return serialize($value);
 	}
 
 
@@ -133,13 +134,23 @@ class ilMemcache extends ilGlobalCacheService {
 	 * @return mixed
 	 */
 	public function unserialize($serialized_value) {
-		return ($serialized_value);
+		return unserialize($serialized_value);
 	}
 
 
+	/**
+	 * @return array
+	 */
 	public function getInfo() {
-		echo '<pre>' . print_r($this->getMemcacheObject()->getStats(), 1) . '</pre>';
-		//return $this->getMemcacheObject()->getAllKeys();
+		if (self::isInstallable()) {
+			$return = array();
+			$return['__cache_info'] = $this->getMemcacheObject()->getStats();
+			foreach ($this->getMemcacheObject()->getAllKeys() as $key) {
+				$return[$key] = $this->getMemcacheObject()->get($key);
+			}
+
+			return $return;
+		}
 	}
 }
 
