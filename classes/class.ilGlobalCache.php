@@ -62,11 +62,10 @@ class ilGlobalCache {
 		self::COMP_OBJ_DEF,
 		self::COMP_ILCTRL,
 		self::COMP_COMPONENT,
-		self::COMP_TEMPLATE,
-		//		self::COMP_SETTINGS,
-		//		self::COMP_PLUGINS,
-		//		self::COMP_RBAC_UA,
-		//		self::COMP_PLUGINSLOTS,
+//		self::COMP_TEMPLATE,
+		self::COMP_SETTINGS,
+		self::COMP_PLUGINS,
+		self::COMP_PLUGINSLOTS,
 	);
 	/**
 	 * @var ilGlobalCache
