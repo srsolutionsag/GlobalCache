@@ -9,6 +9,9 @@ require_once('./Services/GlobalCache/classes/class.ilGlobalCacheService.php');
  */
 class ilXcache extends ilGlobalCacheService {
 
+	const MIN_MEMORY = 32;
+
+
 	/**
 	 * @param $key
 	 *
@@ -90,7 +93,9 @@ class ilXcache extends ilGlobalCacheService {
 		$var_count = ini_get('xcache.var_count') > 0;
 		$api = (php_sapi_name() !== 'cli');
 
-		return ($function_exists AND $var_size AND $var_count AND $api);
+		$active = $function_exists AND $var_size AND $var_count AND $api;
+
+		return $active;
 	}
 
 
@@ -102,8 +107,29 @@ class ilXcache extends ilGlobalCacheService {
 	}
 
 
+	/**
+	 * @return array
+	 */
 	public function getInfo() {
-		return xcache_info(XC_TYPE_VAR, 0);
+		if ($this->isActive()) {
+			return xcache_info(XC_TYPE_VAR, 0);
+		}
+	}
+
+
+	/**
+	 * @return int|string
+	 */
+	protected function getMemoryLimit() {
+		return ini_get('xcache.var_size');
+	}
+
+
+	/**
+	 * @return int
+	 */
+	protected function getMinMemory() {
+		return self::MIN_MEMORY;
 	}
 }
 

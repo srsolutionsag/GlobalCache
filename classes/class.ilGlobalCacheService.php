@@ -15,11 +15,11 @@ abstract class ilGlobalCacheService {
 	/**
 	 * @var bool
 	 */
-	protected static $active = false;
+	protected static $active = array();
 	/**
 	 * @var bool
 	 */
-	protected static $installable = false;
+	protected static $installable = array();
 	/**
 	 * @var string
 	 */
@@ -28,6 +28,10 @@ abstract class ilGlobalCacheService {
 	 * @var string
 	 */
 	protected $component = '';
+	/**
+	 * @var int
+	 */
+	protected $service_type = ilGlobalCache::TYPE_STATIC;
 
 
 	/**
@@ -37,8 +41,8 @@ abstract class ilGlobalCacheService {
 	public function __construct($service_id, $component) {
 		$this->setComponent($component);
 		$this->setServiceId($service_id);
-		self::$active = $this->getActive();
-		self::$installable = $this->getInstallable();
+		self::$active[get_called_class()] = $this->getActive();
+		self::$installable[get_called_class()] = ($this->getInstallable() AND $this->checkMemory());
 		$this->readValid();
 	}
 
@@ -186,7 +190,7 @@ abstract class ilGlobalCacheService {
 	 * @return bool
 	 */
 	public function isActive() {
-		return self::$active;
+		return self::$active[get_called_class()];
 	}
 
 
@@ -194,7 +198,7 @@ abstract class ilGlobalCacheService {
 	 * @return bool
 	 */
 	public function isInstallable() {
-		return self::$installable;
+		return self::$installable[get_called_class()];
 	}
 
 
@@ -213,6 +217,58 @@ abstract class ilGlobalCacheService {
 	 */
 	public function getInfo() {
 		return array();
+	}
+
+
+	/**
+	 * @return string
+	 */
+	public function getInstallationFailureReason() {
+		if (! $this->getInstallable()) {
+			return 'Not installed';
+		}
+		if (! $this->checkMemory()) {
+			return 'Not enough Cache-Memory, set to at least ' . $this->getMinMemory() . 'M';
+		}
+
+		return 'Unknown reason';
+	}
+
+
+	/**
+	 * @return int
+	 */
+	protected function getMemoryLimit() {
+		return 9999;
+	}
+
+
+	/**
+	 * @return int
+	 */
+	protected function getMinMemory() {
+		return 0;
+	}
+
+
+	/**
+	 * @return bool
+	 */
+	protected function checkMemory() {
+		$matches = array();
+		$memory_limit = $this->getMemoryLimit();
+		if (preg_match('/^(\d+)(.)$/', $memory_limit, $matches)) {
+			switch ($matches[2]) {
+				case 'M':
+					$memory_limit = $matches[1] * 1024 * 1024; // nnnM -> nnn MB
+					break;
+				case 'K':
+					$memory_limit = $matches[1] * 1024; // nnnK -> nnn KB
+					break;
+			}
+		}
+
+		return ($memory_limit >= $this->getMinMemory() * 1024 * 1024);
 	}
 
 
@@ -236,6 +292,22 @@ abstract class ilGlobalCacheService {
 	 * @return mixed
 	 */
 	abstract public function flush();
+
+
+	/**
+	 * @param int $service_type
+	 */
+	public function setServiceType($service_type) {
+		$this->service_type = $service_type;
+	}
+
+
+	/**
+	 * @return int
+	 */
+	public function getServiceType() {
+		return $this->service_type;
+	}
 }
 
 ?>

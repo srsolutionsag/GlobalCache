@@ -12,6 +12,7 @@ require_once('./Services/GlobalCache/classes/class.ilGlobalCacheService.php');
  */
 class ilApc extends ilGlobalCacheService {
 
+	const MIN_MEMORY = 128;
 	const CACHE_ID = 'user';
 
 
@@ -26,18 +27,14 @@ class ilApc extends ilGlobalCacheService {
 
 
 	/**
-	 * @param      $key
-	 * @param      $serialized_value
-	 * @param null $ttl
+	 * @param     $key
+	 * @param     $serialized_value
+	 * @param int $ttl
 	 *
 	 * @return array|bool
 	 */
-	public function set($key, $serialized_value, $ttl = NULL) {
-		if ($this->exists($key)) {
-			return apc_store($this->returnKey($key), $serialized_value, $ttl);
-		} else {
-			return apc_add($this->returnKey($key), $serialized_value, $ttl);
-		}
+	public function set($key, $serialized_value, $ttl = 0) {
+		return apc_store($this->returnKey($key), $serialized_value, $ttl);
 	}
 
 
@@ -47,7 +44,7 @@ class ilApc extends ilGlobalCacheService {
 	 * @return mixed
 	 */
 	public function get($key) {
-		return (apc_fetch($this->returnKey($key)));
+		return apc_fetch($this->returnKey($key));
 	}
 
 
@@ -75,7 +72,7 @@ class ilApc extends ilGlobalCacheService {
 	 * @return mixed|string
 	 */
 	public function serialize($value) {
-		return serialize($value);
+		return ($value);
 	}
 
 
@@ -85,7 +82,7 @@ class ilApc extends ilGlobalCacheService {
 	 * @return mixed
 	 */
 	public function unserialize($serialized_value) {
-		return unserialize($serialized_value);
+		return ($serialized_value);
 	}
 
 
@@ -93,19 +90,28 @@ class ilApc extends ilGlobalCacheService {
 	 * @return array
 	 */
 	public function getInfo() {
-		$iter = new APCIterator(self::CACHE_ID);
 		$return = array();
-		$match = "/" . $this->getServiceId() . "_" . $this->getComponent() . "_([_.a-zA-Z0-9]*)/uism";
-		foreach ($iter as $item) {
-			$key = $item['key'];
-//						echo '<pre>' . print_r($key, 1) . '</pre>';
-			if (preg_match($match, $key, $matches)) {
-//				echo '<pre>' . print_r($matches, 1) . '</pre>';
-				if ($matches[1]) {
-					if ($this->isValid($matches[1])) {
-						$return[$matches[1]] = $this->unserialize($item['value']);
-					}
-				}
+
+		$cache_info = apc_cache_info();
+
+		unset($cache_info['cache_list']);
+		unset($cache_info['slot_distribution']);
+
+		$return['__cache_info'] = array(
+			'apc.enabled' => ini_get('apc.enabled'),
+			'apc.shm_size' => ini_get('apc.shm_size'),
+			'apc.shm_segments' => ini_get('apc.shm_segments'),
+			'apc.gc_ttl' => ini_get('apc.gc_ttl'),
+			'apc.user_ttl' => ini_get('apc.ttl'),
+			'info' => $cache_info
+		);
+
+		$cache_info = apc_cache_info();
+		foreach ($cache_info['cache_list'] as $dat) {
+			$key = $dat['key'];
+
+			if (preg_match('/' . $this->getServiceId() . '_' . $this->getComponent() . '/', $key)) {
+				$return[$key] = apc_fetch($key);
 			}
 		}
 
@@ -119,10 +125,26 @@ class ilApc extends ilGlobalCacheService {
 
 
 	/**
-	 * @description set self::$installable
+	 * @return bool
 	 */
 	protected function getInstallable() {
 		return function_exists('apc_store');
+	}
+
+
+	/**
+	 * @return int|string
+	 */
+	protected function getMemoryLimit() {
+		return ini_get('apc.shm_size');
+	}
+
+
+	/**
+	 * @return int
+	 */
+	protected function getMinMemory() {
+		return self::MIN_MEMORY;
 	}
 }
 
