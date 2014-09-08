@@ -119,6 +119,22 @@ class ilMemcache extends ilGlobalCacheService {
 
 
 	/**
+	 * @return string
+	 */
+	public function getInstallationFailureReason() {
+		if ($this->getMemcacheObject() instanceof Memcached) {
+			$stats = $this->getMemcacheObject()->getStats();
+
+			if (! $stats[self::STD_SERVER . ':' . self::STD_PORT]['pid'] > 0) {
+				return 'No Memcached-Server available';
+			}
+		}
+
+		return parent::getInstallationFailureReason();
+	}
+
+
+	/**
 	 * @param $value
 	 *
 	 * @return mixed

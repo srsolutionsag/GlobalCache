@@ -20,6 +20,7 @@ class ilGlobalCache {
 	const TYPE_APC = 3;
 	const TYPE_FALLBACK = self::TYPE_STATIC;
 	const COMP_LNG = 'lng';
+	const COMP_CLNG = 'clng';
 	const COMP_OBJ_DEF = 'obj_def';
 	const COMP_SETTINGS = 'set';
 	const COMP_TEMPLATE = 'tpl';
@@ -33,7 +34,7 @@ class ilGlobalCache {
 	 */
 	protected static $types = array(
 		self::TYPE_MEMCACHED,
-		// self::TYPE_XCACHE,
+		//		self::TYPE_XCACHE,
 		self::TYPE_APC,
 		self::TYPE_STATIC
 	);
@@ -42,6 +43,7 @@ class ilGlobalCache {
 	 */
 	protected static $registred_components = array(
 		self::COMP_LNG,
+		self::COMP_CLNG,
 		self::COMP_OBJ_DEF,
 		self::COMP_SETTINGS,
 		self::COMP_TEMPLATE,
@@ -56,12 +58,13 @@ class ilGlobalCache {
 	 */
 	protected static $active_types = array(
 		self::COMP_LNG,
-		//		self::COMP_OBJ_DEF,
+		self::COMP_CLNG,
+		self::COMP_OBJ_DEF,
+		self::COMP_ILCTRL,
+		self::COMP_COMPONENT,
+		self::COMP_TEMPLATE,
 		//		self::COMP_SETTINGS,
-		//		self::COMP_TEMPLATE,
-		//		self::COMP_ILCTRL,
 		//		self::COMP_PLUGINS,
-		//		self::COMP_COMPONENT,
 		//		self::COMP_RBAC_UA,
 		//		self::COMP_PLUGINSLOTS,
 	);
@@ -115,7 +118,7 @@ class ilGlobalCache {
 	 *
 	 * @return ilGlobalCache
 	 */
-	public static function getInstance($component = NULL) {
+	public static function getInstance($component) {
 		if (! isset(self::$instances[$component])) {
 			$type = self::getComponentType($component);
 			$ilGlobalCache = new self($type, $component);
@@ -162,11 +165,14 @@ class ilGlobalCache {
 	 */
 	protected function __construct($service_type_id, $component = NULL) {
 		$this->setComponent($component);
+		/*
 		if (function_exists('ftok')) {
 			$service_id = substr($shm_key = ftok(__FILE__, 't'), 0, 6);
 		} else {
 			$service_id = ILIAS_CLIENT_ID;
 		}
+		*/
+		$service_id = 'ilias';
 		$this->setServiceid($service_id);
 		$this->setActive(in_array($component, self::$active_types));
 		switch ($service_type_id) {
@@ -227,6 +233,14 @@ class ilGlobalCache {
 
 
 	/**
+	 * @return string
+	 */
+	public function getInstallationFailureReason() {
+		return $this->global_cache->getInstallationFailureReason();
+	}
+
+
+	/**
 	 * @param $key
 	 *
 	 * @throws RuntimeException
@@ -275,9 +289,9 @@ class ilGlobalCache {
 		}
 		$unserialized_return = $this->global_cache->unserialize($this->global_cache->get($key));
 		if ($unserialized_return) {
-			if ($this->global_cache->isValid($key)) {
-				return $unserialized_return;
-			}
+			//if (!$this->global_cache->isValid($key)) {
+			return $unserialized_return;
+			//}
 		}
 
 		return NULL;
