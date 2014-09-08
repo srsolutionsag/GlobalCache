@@ -34,16 +34,22 @@ class ilGlobalCacheDBLayer {
 	 */
 	protected $cached_results = array();
 	/**
+	 * @var int
+	 */
+	protected $ttl = NULL;
+	/**
 	 * @var ilGlobalCache
 	 */
 	protected $global_cache;
 
 
 	/**
-	 * @param $component
-	 * @param $table_name
+	 * @param     $component
+	 * @param     $table_name
+	 * @param int $ttl
 	 */
-	protected function __construct($component, $table_name) {
+	protected function __construct($component, $table_name, $ttl = NULL) {
+		$this->setTtl($ttl);
 		$this->setComponent($component);
 		$this->setTableName($table_name);
 		$this->global_cache = ilGlobalCache::getInstance($component);
@@ -71,7 +77,7 @@ class ilGlobalCacheDBLayer {
 
 	protected function writeToCache() {
 		if ($this->global_cache->isActive()) {
-			$this->global_cache->set($this->getTableName() . '_raw_data', $this->getRawData());
+			$this->global_cache->set($this->getTableName() . '_raw_data', $this->getRawData(), $this->getTtl());
 			$this->updateCachedResults();
 		}
 	}
@@ -238,6 +244,22 @@ class ilGlobalCacheDBLayer {
 	 */
 	public function getComponent() {
 		return $this->component;
+	}
+
+
+	/**
+	 * @param int $ttl
+	 */
+	public function setTtl($ttl) {
+		$this->ttl = $ttl;
+	}
+
+
+	/**
+	 * @return int
+	 */
+	public function getTtl() {
+		return $this->ttl;
 	}
 }
 
