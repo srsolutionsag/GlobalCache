@@ -41,6 +41,10 @@ class ilGlobalCacheDBLayer {
 	 * @var ilGlobalCache
 	 */
 	protected $global_cache;
+	/**
+	 * @var ilGcDbWhere[]
+	 */
+	protected $wheres = array();
 
 
 	/**
@@ -101,22 +105,37 @@ class ilGlobalCacheDBLayer {
 	/**
 	 * @param      $field
 	 * @param      $value
-	 *
 	 * @param bool $case_sensitive
 	 *
 	 * @return array
 	 */
 	public function getWhere($field, $value, $case_sensitive = true) {
+		return $this->filter($this->getRawData(), $field, $value, $case_sensitive);
+	}
+
+
+	/**
+	 * @param array $data
+	 * @param       $field
+	 * @param       $value
+	 *
+	 * @param bool  $case_sensitive
+	 *
+	 * @param bool  $strip
+	 *
+	 * @return array
+	 */
+	public function filter(array $data, $field, $value, $case_sensitive = true, $strip = true) {
 		if (is_array($value)) {
-			$index = md5(serialize($value));
+			$index = md5(serialize($value)) . $case_sensitive;
 		} else {
-			$index = $value;
+			$index = $value . $case_sensitive;
 		}
-		if (isset($this->cached_results[$field][$index])) {
-			return $this->cached_results[$field][$index];
+		if (isset($this->cached_results[$this->getTableName()][$field][$index])) {
+			return $this->cached_results[$this->getTableName()][$field][$index];
 		}
 		$result = array();
-		foreach ($this->getRawData() as $dat) {
+		foreach ($data as $dat) {
 			if ($case_sensitive) {
 				if (is_array($value)) {
 					if (in_array($dat->{$field}, $value)) {
@@ -136,11 +155,11 @@ class ilGlobalCacheDBLayer {
 				}
 			}
 		}
-		if (count($result) == 1) {
+		if (count($result) == 1 AND $strip) {
 			$result = $result[0];
 		}
 
-		$this->cached_results[$field][$index] = $result;
+		$this->cached_results[$this->getTableName()][$field][$index] = $result;
 		$this->updateCachedResults();
 
 		return $result;
@@ -149,6 +168,44 @@ class ilGlobalCacheDBLayer {
 
 	protected function updateCachedResults() {
 		$this->global_cache->set($this->getTableName() . '_cached_results', $this->getCachedResults());
+	}
+
+
+	/**
+	 * @param      $field
+	 * @param      $value
+	 * @param bool $case_sensitive
+	 *
+	 * @return $this
+	 */
+	public function where($field, $value, $case_sensitive = true) {
+		$ilGcDbWhere = new ilGcDbWhere();
+		$ilGcDbWhere->setField($field);
+		$ilGcDbWhere->setValue($value);
+		$ilGcDbWhere->setCaseSensitive($case_sensitive);
+		$this->wheres[] = $ilGcDbWhere;
+
+		return $this;
+	}
+
+
+	/**
+	 * @param bool $strip
+	 *
+	 * @return array
+	 */
+	public function get($strip = true) {
+		$result = $this->getRawData();
+		foreach ($this->wheres as $ilGcDbWhere) {
+			$result = $this->filter($result, $ilGcDbWhere->getField(), $ilGcDbWhere->getValue(), $ilGcDbWhere->getCaseSensitive(), false);
+		}
+
+		if (count($result) == 1 AND $strip) {
+			//			echo '<pre>' . print_r($result, 1) . '</pre>';
+			$result = $result[0];
+		}
+
+		return $result;
 	}
 
 
@@ -262,5 +319,70 @@ class ilGlobalCacheDBLayer {
 		return $this->ttl;
 	}
 }
+
+class ilGcDbWhere {
+
+	/**
+	 * @var string
+	 */
+	protected $field = '';
+	/**
+	 * @var string|array
+	 */
+	protected $value;
+	/**
+	 * @var bool
+	 */
+	protected $case_sensitive = true;
+
+
+	/**
+	 * @param boolean $case_sensitive
+	 */
+	public function setCaseSensitive($case_sensitive) {
+		$this->case_sensitive = $case_sensitive;
+	}
+
+
+	/**
+	 * @return boolean
+	 */
+	public function getCaseSensitive() {
+		return $this->case_sensitive;
+	}
+
+
+	/**
+	 * @param string $field
+	 */
+	public function setField($field) {
+		$this->field = $field;
+	}
+
+
+	/**
+	 * @return string
+	 */
+	public function getField() {
+		return $this->field;
+	}
+
+
+	/**
+	 * @param array|string $value
+	 */
+	public function setValue($value) {
+		$this->value = $value;
+	}
+
+
+	/**
+	 * @return array|string
+	 */
+	public function getValue() {
+		return $this->value;
+	}
+}
+
 
 ?>
