@@ -1,7 +1,9 @@
 <?php
 
 require_once('./Services/GlobalCache/classes/class.ilGlobalCacheService.php');
-require_once('./Services/Environment/classes/class.ilRuntime.php');
+if (file_exists('./Services/Environment/classes/class.ilRuntime.php')) {
+	require_once('./Services/Environment/classes/class.ilRuntime.php');
+}
 
 /**
  * Class ilApc
@@ -141,8 +143,10 @@ class ilApc extends ilGlobalCacheService {
 	 * @return string
 	 */
 	protected function getMemoryLimit() {
-		if (ilRuntime::getInstance()->isHHVM()) {
-			return $this->getMinMemory() . 'M';
+		if (class_exists('ilRuntime')) {
+			if (ilRuntime::getInstance()->isHHVM()) {
+				return $this->getMinMemory() . 'M';
+			}
 		}
 
 		return ini_get('apc.shm_size');
