@@ -13,6 +13,10 @@ A new Service for ILIAS , which supports the following requirements:
 
 ilGlobalCache currently supports APC. Memcached, and xCache will follow in a future release.
 
+Usage
+-----
+This service is part of ILIAS 5 (www.ilias.de).
+
 Contact
 ----
 studer + raimann ag
