@@ -18,9 +18,11 @@ Usage
 This service is part of ILIAS 5 (www.ilias.de).
 
 Contact
-----
+-------
 studer + raimann ag  
 Waldeggstrasse 72  
 3097 Liebefeld  
+Switzerland 
+
 info@studer-raimann.ch  
 www.studer-raimann.ch  
