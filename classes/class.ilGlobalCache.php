@@ -3,6 +3,7 @@ require_once('./Services/GlobalCache/classes/Memcache/class.ilMemcache.php');
 require_once('./Services/GlobalCache/classes/Xcache/class.ilXcache.php');
 require_once('./Services/GlobalCache/classes/Apc/class.ilApc.php');
 require_once('./Services/GlobalCache/classes/Static/class.ilStaticCache.php');
+require_once('./Services/GlobalCache/classes/File/class.ilFileCache.php');
 
 /**
  * Class ilGlobalCache
@@ -18,6 +19,7 @@ class ilGlobalCache {
 	const TYPE_XCACHE = 1;
 	const TYPE_MEMCACHED = 2;
 	const TYPE_APC = 3;
+	const TYPE_FILE = 99;
 	const TYPE_FALLBACK = self::TYPE_STATIC;
 	const COMP_CLNG = 'clng';
 	const COMP_OBJ_DEF = 'obj_def';
@@ -34,7 +36,8 @@ class ilGlobalCache {
 		//		self::TYPE_MEMCACHED,
 		//		self::TYPE_XCACHE,
 		self::TYPE_APC,
-		self::TYPE_STATIC
+		self::TYPE_STATIC,
+		self::TYPE_FILE
 	);
 	/**
 	 * @var array
@@ -172,7 +175,9 @@ class ilGlobalCache {
 		$types = array();
 		foreach (self::$types as $type) {
 			$obj = new self($type);
-			$types[$type] = $obj;
+			if ($obj->getShowInSetup()) {
+				$types[$type] = $obj;
+			}
 		}
 
 		return $types;
@@ -211,6 +216,9 @@ class ilGlobalCache {
 				break;
 			case self::TYPE_STATIC:
 				return 'ilStaticCache';
+				break;
+			case self::TYPE_FILE:
+				return 'ilFileCache';
 				break;
 		}
 	}
@@ -433,6 +441,14 @@ class ilGlobalCache {
 	 */
 	public function getServiceType() {
 		return $this->global_cache->getServiceType();
+	}
+
+
+	/**
+	 * @return bool
+	 */
+	public function getShowInSetup() {
+		return $this->global_cache->getShowInSetup();
 	}
 }
 

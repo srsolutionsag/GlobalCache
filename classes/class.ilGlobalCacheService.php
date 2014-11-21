@@ -40,6 +40,10 @@ abstract class ilGlobalCacheService {
 	 * @var string
 	 */
 	protected $valid_key_hash = '';
+	/**
+	 * @var bool
+	 */
+	protected $show_in_setup = true;
 
 
 	/**
@@ -239,10 +243,10 @@ abstract class ilGlobalCacheService {
 	 * @return string
 	 */
 	public function getInstallationFailureReason() {
-		if (! $this->getInstallable()) {
+		if (!$this->getInstallable()) {
 			return 'Not installed';
 		}
-		if (! $this->checkMemory()) {
+		if (!$this->checkMemory()) {
 			return 'Not enough Cache-Memory, set to at least ' . $this->getMinMemory() . 'M';
 		}
 
@@ -324,6 +328,22 @@ abstract class ilGlobalCacheService {
 	 */
 	public function getServiceType() {
 		return $this->service_type;
+	}
+
+
+	/**
+	 * @return boolean
+	 */
+	public function getShowInSetup() {
+		return $this->show_in_setup;
+	}
+
+
+	/**
+	 * @param boolean $show_in_setup
+	 */
+	public function setShowInSetup($show_in_setup) {
+		$this->show_in_setup = $show_in_setup;
 	}
 }
 
