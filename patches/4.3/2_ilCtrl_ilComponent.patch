@@ -1,0 +1,1254 @@
+Index: Services/UICore/classes/class.ilCachedCtrl.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- Services/UICore/classes/class.ilCachedCtrl.php	(revision )
++++ Services/UICore/classes/class.ilCachedCtrl.php	(revision )
+@@ -0,0 +1,266 @@
++<?php
++
++/**
++ * Class ilCachedCtrl
++ *
++ * @author  Fabian Schmid <fs@studer-raimann.ch>
++ * @version 1.0.0
++ */
++class ilCachedCtrl {
++
++	/**
++	 * @var bool
++	 */
++	protected $changed = false;
++	/**
++	 * @var ilCachedCtrl
++	 */
++	protected static $instance;
++	/**
++	 * @var bool
++	 */
++	protected $loaded = false;
++	/**
++	 * @var array
++	 */
++	protected $module_classes = array();
++	/**
++	 * @var array
++	 */
++	protected $service_classes = array();
++	/**
++	 * @var array
++	 */
++	protected $ctrl_calls = array();
++	/**
++	 * @var array
++	 */
++	protected $ctrl_classfile = array();
++	/**
++	 * @var array
++	 */
++	protected $ctrl_classfile_parent = array();
++
++
++	/**
++	 * @return ilCachedCtrl
++	 */
++	public static function getInstance() {
++		if (!isset(self::$instance)) {
++			$global_cache = ilGlobalCache::getInstance(ilGlobalCache::COMP_ILCTRL);
++			$cached_obj = $global_cache->get('ilCachedCtrl');
++			if ($cached_obj instanceof ilCachedCtrl) {
++				self::$instance = $cached_obj;
++			} else {
++				self::$instance = new self();
++				$global_cache->set('ilCachedCtrl', self::$instance);
++			}
++		}
++
++		return self::$instance;
++	}
++
++
++	public static function flush() {
++		ilGlobalCache::getInstance(ilGlobalCache::COMP_ILCTRL)->flush();
++		self::$instance = NULL;
++	}
++
++
++	/**
++	 * @return bool
++	 */
++	public function isActive() {
++		return ilGlobalCache::getInstance(ilGlobalCache::COMP_ILCTRL)->isActive();
++	}
++
++
++	protected function __construct() {
++		$this->global_cache = ilGlobalCache::getInstance(ilGlobalCache::COMP_ILCTRL);
++		$this->readFromDB();
++	}
++
++
++	public function __destruct() {
++		if ($this->changed) {
++			$this->global_cache->set('ilCachedCtrl', $this);
++		}
++	}
++
++
++	protected function readFromDB() {
++		global $ilDB;
++		/**
++		 * @var $ilDB ilDB
++		 */
++		$set = $ilDB->query('SELECT module_class.*, LOWER(module_class.class) lower_class FROM module_class');
++		while ($rec = $ilDB->fetchAssoc($set)) {
++			$this->module_classes[$rec['lower_class']] = $rec;
++		}
++		$set = $ilDB->query('SELECT service_class.*, LOWER(service_class.class) lower_class FROM service_class');
++		while ($rec = $ilDB->fetchAssoc($set)) {
++			$this->service_classes[$rec['lower_class']] = $rec;
++		}
++		$set = $ilDB->query('SELECT * FROM ctrl_calls');
++		while ($rec = $ilDB->fetchAssoc($set)) {
++			$this->ctrl_calls[$rec['parent']][] = $rec;
++		}
++		$set = $ilDB->query('SELECT * FROM ctrl_classfile');
++		while ($rec = $ilDB->fetchAssoc($set)) {
++			$this->ctrl_classfile[$rec['cid']] = $rec;
++			$this->ctrl_classfile_parent[$rec['class']] = $rec;
++		}
++	}
++
++
++	/**
++	 * @param $class
++	 *
++	 * @return mixed
++	 */
++	public function lookupModuleClass($class) {
++		return $this->module_classes[$class];
++	}
++
++
++	/**
++	 * @param $class
++	 *
++	 * @return mixed
++	 */
++	public function lookupServiceClass($class) {
++		return $this->service_classes[$class];
++	}
++
++
++	/**
++	 * @param $cid
++	 *
++	 * @return mixed
++	 */
++	public function lookupCid($cid) {
++		return $this->ctrl_classfile[$cid];
++	}
++
++
++	/**
++	 * @param $parent
++	 *
++	 * @return mixed
++	 */
++	public function lookupCall($parent) {
++		if (is_array($this->ctrl_calls[$parent])) {
++			return $this->ctrl_calls[$parent];
++		} else {
++			return array();
++		}
++	}
++
++
++	/**
++	 * @param $class
++	 *
++	 * @return mixed
++	 */
++	public function lookupClassFile($class) {
++		return $this->ctrl_classfile_parent[$class];
++	}
++
++
++	/**
++	 * @return boolean
++	 */
++	public function getLoaded() {
++		return $this->loaded;
++	}
++
++
++	/**
++	 * @param boolean $loaded
++	 */
++	public function setLoaded($loaded) {
++		$this->loaded = $loaded;
++	}
++
++
++	/**
++	 * @param array $ctrl_calls
++	 */
++	public function setCtrlCalls($ctrl_calls) {
++		$this->ctrl_calls = $ctrl_calls;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getCtrlCalls() {
++		return $this->ctrl_calls;
++	}
++
++
++	/**
++	 * @param array $ctrl_classfile
++	 */
++	public function setCtrlClassfile($ctrl_classfile) {
++		$this->ctrl_classfile = $ctrl_classfile;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getCtrlClassfile() {
++		return $this->ctrl_classfile;
++	}
++
++
++	/**
++	 * @param array $module_classes
++	 */
++	public function setModuleClasses($module_classes) {
++		$this->module_classes = $module_classes;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getModuleClasses() {
++		return $this->module_classes;
++	}
++
++
++	/**
++	 * @param array $service_classes
++	 */
++	public function setServiceClasses($service_classes) {
++		$this->service_classes = $service_classes;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getServiceClasses() {
++		return $this->service_classes;
++	}
++
++
++	/**
++	 * @param array $ctrl_classfile_parent
++	 */
++	public function setCtrlClassfileParent($ctrl_classfile_parent) {
++		$this->ctrl_classfile_parent = $ctrl_classfile_parent;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getCtrlClassfileParent() {
++		return $this->ctrl_classfile_parent;
++	}
++}
++
++?>
+Index: Services/Component/classes/class.ilCachedComponentData.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- Services/Component/classes/class.ilCachedComponentData.php	(revision )
++++ Services/Component/classes/class.ilCachedComponentData.php	(revision )
+@@ -0,0 +1,599 @@
++<?php
++require_once('./Services/GlobalCache/classes/class.ilGlobalCacheDBLayer.php');
++
++/**
++ * Class ilCachedComponentData
++ *
++ * @author  Fabian Schmid <fs@studer-raimann.ch>
++ * @version 1.0.0
++ */
++class ilCachedComponentData {
++
++	/**
++	 * @var array
++	 */
++	protected static $cached_results = array();
++	/**
++	 * @var ilCachedComponentData
++	 */
++	protected static $instance;
++	/**
++	 * @var array
++	 */
++	protected static $stored_results = array();
++	/**
++	 * @var bool
++	 */
++	protected $changed = false;
++	/**
++	 * @var bool
++	 */
++	protected $loaded = false;
++	/**
++	 * @var array
++	 */
++	protected $obj_def_name_to_id = array();
++	/**
++	 * @var array
++	 */
++	protected $obj_def_name_and_type_raw = array();
++	/**
++	 * @var array
++	 */
++	protected $il_component = array();
++	/**
++	 * @var array
++	 */
++	protected $il_object_def = array();
++	/**
++	 * @var array
++	 */
++	protected $il_object_subobj = array();
++	/**
++	 * @var array
++	 */
++	protected $subobj_for_parent = array();
++	/**
++	 * @var array
++	 */
++	protected $grouped_rep_obj_types = array();
++	/**
++	 * @var array
++	 */
++	protected $il_pluginslot_by_comp = array();
++	/**
++	 * @var array
++	 */
++	protected $il_pluginslot_by_id = array();
++	/**
++	 * @var array
++	 */
++	protected $il_pluginslot_by_name = array();
++	/**
++	 * @var array
++	 */
++	protected $il_plugin_by_id = array();
++	/**
++	 * @var array
++	 */
++	protected $il_object_group = array();
++	/**
++	 * @var array
++	 */
++	protected $il_object_sub_type = array();
++	/**
++	 * @var array
++	 */
++	protected $il_plugin_active = array();
++	/**
++	 * @var array
++	 */
++	protected $il_plugin_by_name = array();
++
++
++	protected function __construct() {
++		$this->global_cache = ilGlobalCache::getInstance(ilGlobalCache::COMP_COMPONENT);
++		$this->readFromDB();
++	}
++
++
++	/**
++	 * @return boolean
++	 */
++	public function getLoaded() {
++		return $this->loaded;
++	}
++
++
++	/**
++	 * @param boolean $loaded
++	 */
++	public function setLoaded($loaded) {
++		$this->loaded = $loaded;
++	}
++
++
++	protected function readFromDB() {
++		global $ilDB;
++		/**
++		 * @var $ilDB ilDB
++		 */
++
++		$set = $ilDB->query('SELECT * FROM il_component');
++		while ($rec = $ilDB->fetchAssoc($set)) {
++			$this->il_component[$rec['id']] = $rec;
++			$this->obj_def_name_to_id[$rec['id']] = $rec['name'];
++			$this->obj_def_name_and_type_raw[$rec['type']][$rec['name']] = $rec;
++		}
++
++		$set = $ilDB->query('SELECT * FROM il_object_def');
++		while ($rec = $ilDB->fetchAssoc($set)) {
++			$this->il_object_def[$rec['id']] = $rec;
++		}
++
++		$set = $ilDB->query('SELECT * FROM il_object_subobj');
++		while ($rec = $ilDB->fetchAssoc($set)) {
++			$this->il_object_subobj[] = $rec;
++			$parent = $rec['parent'];
++			$this->subobj_for_parent[$parent][] = $rec;
++		}
++		$set = $ilDB->query('SELECT DISTINCT(id) AS sid, parent, il_object_def.* FROM il_object_def, il_object_subobj WHERE NOT (system = 1) AND NOT (sideblock = 1) AND subobj = id');
++		while ($rec = $ilDB->fetchAssoc($set)) {
++			$this->grouped_rep_obj_types[$rec['parent']][] = $rec;
++		}
++
++		$set = $ilDB->query('SELECT * FROM il_pluginslot');
++		while ($rec = $ilDB->fetchAssoc($set)) {
++			$this->il_pluginslot_by_comp[$rec['component']][] = $rec;
++			$this->il_pluginslot_by_id[$rec['id']] = $rec;
++			$this->il_pluginslot_by_name[$rec['name']] = $rec;
++		}
++
++		$set = $ilDB->query('SELECT * FROM il_plugin');
++		$this->il_plugin_active = array();
++		while ($rec = $ilDB->fetchAssoc($set)) {
++			$this->il_plugin_by_id[$rec['plugin_id']] = $rec;
++			$this->il_plugin_by_name[$rec['name']] = $rec;
++			if ($rec['active'] == 1) {
++				$this->il_plugin_active[$rec['slot_id']][] = $rec;
++			}
++		}
++		$set = $ilDB->query('SELECT * FROM il_object_group');
++		while ($rec = $ilDB->fetchAssoc($set)) {
++			$this->il_object_group[$rec['id']] = $rec;
++		}
++//		$set = $ilDB->query('SELECT * FROM il_object_sub_type');
++//		while ($rec = $ilDB->fetchAssoc($set)) {
++//			$this->il_object_sub_type[$rec['obj_type']][] = $rec;
++//		}
++		$this->setLoaded(true);
++		echo "!";
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getIlComponent() {
++		return $this->il_component;
++	}
++
++
++	/**
++	 * @param array $il_component
++	 */
++	public function setIlComponent($il_component) {
++		$this->il_component = $il_component;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getObjDefNameAndTypeRaw() {
++		return $this->obj_def_name_and_type_raw;
++	}
++
++
++	/**
++	 * @param array $obj_def_name_and_type_raw
++	 */
++	public function setObjDefNameAndTypeRaw($obj_def_name_and_type_raw) {
++		$this->obj_def_name_and_type_raw = $obj_def_name_and_type_raw;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getObjDefNameToId() {
++		return $this->obj_def_name_to_id;
++	}
++
++
++	/**
++	 * @param array $obj_def_name_to_id
++	 */
++	public function setObjDefNameToId($obj_def_name_to_id) {
++		$this->obj_def_name_to_id = $obj_def_name_to_id;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getIlObjectDef() {
++		return $this->il_object_def;
++	}
++
++
++	/**
++	 * @param array $il_object_def
++	 */
++	public function setIlObjectDef($il_object_def) {
++		$this->il_object_def = $il_object_def;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getIlObjectSubobj() {
++		return $this->il_object_subobj;
++	}
++
++
++	/**
++	 * @param array $il_object_subobj
++	 */
++	public function setIlObjectSubobj($il_object_subobj) {
++		$this->il_object_subobj = $il_object_subobj;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getGroupedRepObjTypes() {
++		return $this->grouped_rep_obj_types;
++	}
++
++
++	/**
++	 * @param array $grouped_rep_obj_types
++	 */
++	public function setGroupedRepObjTypes($grouped_rep_obj_types) {
++		$this->grouped_rep_obj_types = $grouped_rep_obj_types;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getIlPluginslotByComp() {
++		return $this->il_pluginslot_by_comp;
++	}
++
++
++	/**
++	 * @param array $il_pluginslot_by_service
++	 */
++	public function setIlPluginslotByComp($il_pluginslot_by_service) {
++		$this->il_pluginslot_by_comp = $il_pluginslot_by_service;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getIlPluginslotById() {
++		return $this->il_pluginslot_by_id;
++	}
++
++
++	/**
++	 * @param array $il_pluginslot_by_id
++	 */
++	public function setIlPluginslotById($il_pluginslot_by_id) {
++		$this->il_pluginslot_by_id = $il_pluginslot_by_id;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getIlPluginslotByName() {
++		return $this->il_pluginslot_by_name;
++	}
++
++
++	/**
++	 * @param array $il_pluginslot_by_name
++	 */
++	public function setIlPluginslotByName($il_pluginslot_by_name) {
++		$this->il_pluginslot_by_name = $il_pluginslot_by_name;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getIlPluginById() {
++		return $this->il_plugin_by_id;
++	}
++
++
++	/**
++	 * @param array $il_plugin_by_id
++	 */
++	public function setIlPluginById($il_plugin_by_id) {
++		$this->il_plugin_by_id = $il_plugin_by_id;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getIlPluginByName() {
++		return $this->il_plugin_by_name;
++	}
++
++
++	/**
++	 * @param array $il_plugin_by_name
++	 */
++	public function setIlPluginByName($il_plugin_by_name) {
++		$this->il_plugin_by_name = $il_plugin_by_name;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getIlPluginActive() {
++		return $this->il_plugin_active;
++	}
++
++
++	/**
++	 * @param array $il_plugin_active
++	 */
++	public function setIlPluginActive($il_plugin_active) {
++		$this->il_plugin_active = $il_plugin_active;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getIlObjectGroup() {
++		return $this->il_object_group;
++	}
++
++
++	/**
++	 * @param array $il_object_group
++	 */
++	public function setIlObjectGroup($il_object_group) {
++		$this->il_object_group = $il_object_group;
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getIlObjectSubType() {
++		return $this->il_object_sub_type;
++	}
++
++
++	/**
++	 * @param array $il_object_sub_type
++	 */
++	public function setIlObjectSubType($il_object_sub_type) {
++		$this->il_object_sub_type = $il_object_sub_type;
++	}
++
++
++	/**
++	 * @return ilCachedComponentData
++	 */
++	public static function getInstance() {
++		if (!isset(self::$instance)) {
++
++			$global_cache = ilGlobalCache::getInstance(ilGlobalCache::COMP_COMPONENT);
++			$cached_obj = $global_cache->get('ilCachedComponentData');
++			if ($cached_obj instanceof ilCachedComponentData) {
++				self::$instance = $cached_obj;
++			} else {
++				self::$instance = new self();
++				$global_cache->set('ilCachedComponentData', self::$instance);
++			}
++		}
++
++		return self::$instance;
++	}
++
++
++	public static function flush() {
++		ilGlobalCache::getInstance(ilGlobalCache::COMP_COMPONENT)->flush();
++		self::$instance = NULL;
++	}
++
++
++	/**
++	 * @param $name
++	 *
++	 * @return mixed
++	 */
++	public function lookupPluginByName($name) {
++		return $this->il_plugin_by_name[$name];
++	}
++
++
++	/**
++	 * @param $slot_id
++	 *
++	 * @return mixed
++	 */
++	public function lookupActivePluginsBySlotId($slot_id) {
++		if (is_array($this->il_plugin_active[$slot_id])) {
++			return $this->il_plugin_active[$slot_id];
++		} else {
++			return array();
++		}
++	}
++
++
++	/**
++	 * @param $parent
++	 *
++	 * @return mixed
++	 */
++	public function lookupSubObjForParent($parent) {
++		if (is_array($parent)) {
++			$index = md5(serialize($parent));
++			if (isset(self::$cached_results['subop_par'][$index])) {
++				return self::$cached_results['subop_par'][$index];
++			}
++
++			$return = array();
++			foreach ($parent as $p) {
++				if (is_array($this->subobj_for_parent[$p])) {
++					foreach ($this->subobj_for_parent[$p] as $rec) {
++						$return[] = $rec;
++					}
++				}
++			}
++
++			self::$cached_results['subop_par'][$index] = $return;
++			$this->changed = true;
++
++			return $return;
++		}
++
++		return $this->subobj_for_parent[$parent];
++	}
++
++
++	/**
++	 * @param $name
++	 * @param $type
++	 *
++	 * @return mixed
++	 */
++	public function lookCompId($type, $name) {
++		return $this->obj_def_name_and_type_raw[$type][$name]['id'];
++	}
++
++
++	/**
++	 * @param $name
++	 * @param $type
++	 *
++	 * @return mixed
++	 */
++	public function lookupCompInfo($type, $name) {
++		if (!$type) {
++			if (isset($this->obj_def_name_and_type_raw['Modules'][$name])) {
++				$type = 'Modules';
++			} else {
++				$type = 'Services';
++			}
++		}
++
++		return $this->obj_def_name_and_type_raw[$type][$name];
++	}
++
++
++	public function __destruct() {
++		if ($this->changed) {
++			$this->global_cache->set('ilCachedComponentData', $this);
++		}
++	}
++
++
++	/**
++	 * @param $parent
++	 *
++	 * @return mixed
++	 */
++	public function lookupGroupedRepObj($parent) {
++		if (is_array($parent)) {
++			$index = md5(serialize($parent));
++			if (isset($cached_results['grpd_repo'][$index])) {
++				return $cached_results['grpd_repo'][$index];
++			}
++
++			$return = array();
++			$sids = array();
++			foreach ($parent as $p) {
++				$s = $this->grouped_rep_obj_types[$p];
++				foreach ($s as $child) {
++					if (!in_array($child['sid'], $sids)) {
++						$sids[] = $child['sid'];
++						$return[] = $child;
++					}
++				}
++			}
++			$this->changed = true;
++			$cached_results['grpd_repo'][$index] = $return;
++
++			return $return;
++		} else {
++			return $this->grouped_rep_obj_types[$parent];
++		}
++	}
++
++
++	/**
++	 * @param $component
++	 *
++	 * @return mixed
++	 */
++	public function lookupPluginSlotByComponent($component) {
++		if (is_array($this->il_pluginslot_by_comp[$component])) {
++			return $this->il_pluginslot_by_comp[$component];
++		}
++
++		return array();
++	}
++
++
++	/**
++	 * @param $id
++	 *
++	 * @return mixed
++	 */
++	public function lookupPluginSlotById($id) {
++		return $this->il_pluginslot_by_id[$id];
++	}
++
++
++	/**
++	 * @param $name
++	 *
++	 * @return mixed
++	 */
++	public function lookupPluginSlotByName($name) {
++		return $this->il_pluginslot_by_name[$name];
++	}
++
++
++	/**
++	 * @return array
++	 */
++	public function getSubobjForParent() {
++		return $this->subobj_for_parent;
++	}
++
++
++	/**
++	 * @param array $subobj_for_parent
++	 */
++	public function setSubobjForParent($subobj_for_parent) {
++		$this->subobj_for_parent = $subobj_for_parent;
++	}
++}
++
++?>
+Index: Services/Component/classes/class.ilComponent.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?php\n/* Copyright (c) 1998-2009 ILIAS open source, Extended GPL, see docs/LICENSE */\n\n\ndefine (\"IL_COMP_MODULE\", \"Modules\");\ndefine (\"IL_COMP_SERVICE\", \"Services\");\ndefine (\"IL_COMP_PLUGIN\", \"Plugins\");\n\n/**\n* @defgroup ServicesComponent Services/Component\n*\n* ILIAS Component. This is the parent class for all ILIAS components.\n* Components are Modules (Modules are ressources that can be added to the\n* ILIAS repository), Services (Services provide cross-sectional functionalities\n* for other ILIAS components) and Plugins.\n*\n* @author Alex Killing <alex.killing@gmx.de>\n* @version $Id$\n*\n* @ingroup ServicesComponent\n*/\nabstract class ilComponent\n{\n\t/**\n\t* Get Version Number of Component. The number should be changed\n\t* if anything in the code is changed. Otherwise ILIAS will not be able\n\t* to recognize any change in the module.\n\t*\n\t* The format must be:\n\t* <major number>.<minor number>.<bugfix number>\n\t* <bugfix number> should be increased for bugfixes\n\t* <minor number> should be increased for behavioural changes (and new functionalities)\n\t* <major number> should be increased for major revisions\n\t*\n\t* The number should be returned directly as string, e.g. return \"1.0.2\";\n\t*\n\t* @return\tstring\t\tversion number\n\t*/\n\tabstract function getVersion();\n\t\n\tabstract function isCore();\n\t\n\tabstract static function getComponentType();\n\t\n\t/**\n\t* Get Name.\n\t*\n\t* @return\tstring\tName\n\t*/\n\tabstract function getName();\n\n\tfunction __construct()\n\t{\n\t\tglobal $ilDB;\n\t\t\n\t\t$set = $ilDB->queryF(\"SELECT * FROM il_component WHERE type = %s \".\n\t\t\t\" AND name = %s\", array(\"text\", \"text\"),\n\t\t\tarray($this->getComponentType(), $this->getName()));\t\t\t\n\t\t$rec = $ilDB->fetchAssoc($set);\n\n\t\t$this->setId($rec[\"id\"]);\n\t\t$this->setPluginSlots(ilComponent::lookupPluginSlots(\n\t\t\t$this->getComponentType(), $this->getName()));\n\t}\n\t\n\t/**\n\t* Set Id.\n\t*\n\t* @param\tstring\t$a_id\tId\n\t*/\n\tfinal function setId($a_id)\n\t{\n\t\t$this->id = $a_id;\n\t}\n\n\t/**\n\t* Get Id.\n\t*\n\t* @return\tstring\tId\n\t*/\n\tfinal function getId()\n\t{\n\t\treturn $this->id;\n\t}\n\n\t/**\n\t* Set Plugin Slots.\n\t*\n\t* @param\tarray\t$a_pluginslots\tPlugin Slots\n\t*/\n\tfinal function setPluginSlots($a_pluginslots)\n\t{\n\t\t$this->pluginslots = $a_pluginslots;\n\t}\n\n\t/**\n\t* Get Plugin Slots.\n\t*\n\t* @return\tarray\tPlugin Slots\n\t*/\n\tfinal function getPluginSlots()\n\t{\n\t\treturn $this->pluginslots;\n\t}\n\n\t/**\n\t* Get component object.\n\t*\n\t* @param\tstring\t$a_ctype\tIL_COMP_MODULE | IL_COMP_SERVICE\n\t* @param\tstring\t$a_cname\tcomponent name\n\t*/\n\tfinal static function getComponentObject($a_ctype, $a_cname)\n\t{\n\t\tglobal $ilDB;\n\t\t\n\t\t$set = $ilDB->queryF(\"SELECT * FROM il_component WHERE type = %s \".\n\t\t\t\" AND name = %s\", array(\"text\", \"text\"),\n\t\t\tarray($a_ctype, $a_cname));\n\t\tif (!$ilDB->fetchAssoc($set))\n\t\t{\n\t\t\treturn null;\n\t\t}\n\t\t\n\t\tswitch ($a_ctype)\n\t\t{\n\t\t\tcase IL_COMP_MODULE:\n\t\t\t\tif (is_file(\"./Modules/\".$a_cname.\"/classes/class.il\".$a_cname.\"Module.php\"))\n\t\t\t\t{\n\t\t\t\t\tinclude_once(\"./Modules/\".$a_cname.\"/classes/class.il\".$a_cname.\"Module.php\");\n\t\t\t\t\t$class = \"il\".$a_cname.\"Module\";\n\t\t\t\t\t$comp = new $class();\n\t\t\t\t\treturn $comp;\n\t\t\t\t}\n\t\t\t\tbreak;\n\t\t\t\t\n\t\t\tcase IL_COMP_SERVICE:\n\t\t\t\tif (is_file(\"./Services/\".$a_cname.\"/classes/class.il\".$a_cname.\"Service.php\"))\n\t\t\t\t{\n\t\t\t\t\tinclude_once(\"./Services/\".$a_cname.\"/classes/class.il\".$a_cname.\"Service.php\");\n\t\t\t\t\t$class = \"il\".$a_cname.\"Service\";\n\t\t\t\t\t$comp = new $class();\n\t\t\t\t\treturn $comp;\n\t\t\t\t}\n\t\t\t\tbreak;\n\t\t}\n\t\t\n\t\treturn null;\n\t}\n\n\t/**\n\t* Set Sub Directory.\n\t*\n\t* @param\tstring\t$a_subdirectory\tSub Directory\n\t*/\n\tfunction setSubDirectory($a_subdirectory)\n\t{\n\t\t$this->subdirectory = $a_subdirectory;\n\t}\n\n\t/**\n\t* Get Sub Directory.\n\t*\n\t* @return\tstring\tSub Directory\n\t*/\n\tfunction getSubDirectory()\n\t{\n\t\treturn $this->subdirectory;\n\t}\n\t\n\t/**\n\t* Lookup all plugin slots of a component\n\t*/\n\tstatic function lookupPluginSlots($a_type, $a_name)\n\t{\n\t\tglobal $ilDB;\n\t\t\n\t\t$set = $ilDB->query(\"SELECT * FROM il_pluginslot WHERE component = \".\n\t\t\t$ilDB->quote($a_type.\"/\".$a_name, \"text\"));\n\t\t$ps = array();\n//echo \"<br>\".$a_type.\"/\".$a_name;\n\t\twhile($rec = $ilDB->fetchAssoc($set))\n\t\t{\n\t\t\t$rec[\"dir\"] = \"Customizing/global/plugins/\".$a_type.\"/\".$a_name.\"/\".$rec[\"name\"];\n\t\t\t$rec[\"dir_pres\"] = \"Customizing/global/plugins/<br />\".$a_type.\"/\".$a_name.\"/\".$rec[\"name\"];\n\t\t\t$rec[\"lang_prefix\"] = ilComponent::lookupId($a_type,$a_name).\"_\".$rec[\"id\"].\"_\";\n\t\t\t$ps[$rec[\"id\"]] = $rec;\n\t\t}\n\t\treturn $ps;\n\t}\n\t\n\t/**\n\t* Get name of plugin slot.\n\t*\n\t* @param\tstring\t$a_id\tPlugin Slot ID\n\t*/\n\tfunction getPluginSlotName($a_id)\n\t{\n\t\t$slots = $this->getPluginSlots();\n\t\t\n\t\treturn $slots[$a_id][\"name\"];\n\t}\n\n\t/**\n\t* Get directory of plugin slot.\n\t*\n\t* @param\tstring\t$a_id\tPlugin Slot ID\n\t*/\n\tfunction getPluginSlotDirectory($a_id)\n\t{\n\t\t$slots = $this->getPluginSlots();\n\t\t\n\t\treturn \"Customizing/global/plugins/\".$this->getComponentType().\"/\".\n\t\t\t$this->getName().\"/\".$slots[$a_id][\"name\"];\n\t}\n\t\n\t/**\n\t* Get language prefix for plugin slot.\n\t*\n\t* @param\tstring\t$a_id\tPlugin Slot ID\n\t*/\n\tfunction getPluginSlotLanguagePrefix($a_id)\n\t{\n\t\t$slots = $this->getPluginSlots();\n\t\treturn $this->getId().\"_\".$slots[$a_id][\"id\"].\"_\";\n\t}\n\t\n\t/**\n\t* Lookup ID of a component\n\t*/\n\tstatic function lookupId($a_type, $a_name)\n\t{\n\t\tglobal $ilDB;\n\t\t\n\t\t$set = $ilDB->queryF(\"SELECT * FROM il_component WHERE type = %s \".\n\t\t\t\" AND name = %s\", array(\"text\", \"text\"),\n\t\t\tarray($a_type, $a_name));\n\t\t$rec = $ilDB->fetchAssoc($set);\n\t\t\n\t\treturn $rec[\"id\"];\n\t}\n\t\n\t/**\n\t* Check version number.\n\t*/\n\tstatic final function checkVersionNumber($a_ver)\n\t{\n\t\tglobal $lng;\n\t\t\n\t\t$parts = explode(\".\", $a_ver);\n\t\t\n\t\tif (count($parts) != 3)\n\t\t{\n\t\t\treturn \"Version Number does not conform to format a.b.c\";\n\t\t}\n\t\t\n\t\tif (!is_numeric($parts[0]) || !is_numeric($parts[1]) || !is_numeric($parts[2]))\n\t\t{\n\t\t\treturn \"Not all version number parts a.b.c are numeric.\";\n\t\t}\n\t\t\n\t\treturn $parts;\n\t}\n\n\tstatic final function isVersionGreaterString($a_ver1, $a_ver2)\n\t{\n\t\t$a_arr1 = ilComponent::checkVersionNumber($a_ver1);\n\t\t$a_arr2 = ilComponent::checkVersionNumber($a_ver2);\n\t\tif (is_array($a_arr1) && is_array($a_arr2))\n\t\t{\n\t\t\treturn ilComponent::isVersionGreater($a_arr1, $a_arr2);\n\t\t}\n\t\telse\n\t\t{\n\t\t\treturn false;\n\t\t}\n\t}\n\n\t/**\n\t* Check whether version number is greater than another version number\n\t*\n\t* @param\t$a_ver1\t\tarray\tversion number as array as returned by checkVersionNumber()\n\t* @param\t$a_ver2\t\tarray\tversion number as array as returned by checkVersionNumber()\n\t*\n\t* $return\tboolean\t\ttrue, if $a_ver1 is greater than $a_ver2\n\t*/\n\tstatic final function isVersionGreater($a_ver1, $a_ver2)\n\t{\n\t\tif ($a_ver1[0] > $a_ver2[0])\n\t\t{\n\t\t\treturn true;\n\t\t}\n\t\telse if ($a_ver1[0] < $a_ver2[0])\n\t\t{\n\t\t\treturn false;\n\t\t}\n\t\telse if ($a_ver1[1] > $a_ver2[1])\n\t\t{\n\t\t\treturn true;\n\t\t}\n\t\telse if ($a_ver1[1] < $a_ver2[1])\n\t\t{\n\t\t\treturn false;\n\t\t}\n\t\telse if ($a_ver1[2] > $a_ver2[2])\n\t\t{\n\t\t\treturn true;\n\t\t}\n\n\t\treturn false;\n\t}\n\n}\n?>\n
+===================================================================
+--- Services/Component/classes/class.ilComponent.php	(revision 56812)
++++ Services/Component/classes/class.ilComponent.php	(revision )
+@@ -1,7 +1,7 @@
+ <?php
+ /* Copyright (c) 1998-2009 ILIAS open source, Extended GPL, see docs/LICENSE */
++require_once('class.ilCachedComponentData.php');
+ 
+-
+ define ("IL_COMP_MODULE", "Modules");
+ define ("IL_COMP_SERVICE", "Services");
+ define ("IL_COMP_PLUGIN", "Plugins");
+@@ -49,18 +49,31 @@
+ 	*/
+ 	abstract function getName();
+ 
++	/**
++	 * @var ilCachedComponentData
++	 */
++	protected $global_cache;
++
++
+ 	function __construct()
+ 	{
+-		global $ilDB;
++//		global $ilDB;
+-		
++
+-		$set = $ilDB->queryF("SELECT * FROM il_component WHERE type = %s ".
+-			" AND name = %s", array("text", "text"),
+-			array($this->getComponentType(), $this->getName()));			
+-		$rec = $ilDB->fetchAssoc($set);
++		$this->global_cache = ilCachedComponentData::getInstance();
+ 
++		$rec = $this->global_cache->lookCompId($this->getName(), $this->getComponentType());
+ 		$this->setId($rec["id"]);
+ 		$this->setPluginSlots(ilComponent::lookupPluginSlots(
+ 			$this->getComponentType(), $this->getName()));
++
++//		$set = $ilDB->queryF("SELECT * FROM il_component WHERE type = %s ".
++//			" AND name = %s", array("text", "text"),
++//			array($this->getComponentType(), $this->getName()));
++//		$rec = $ilDB->fetchAssoc($set);
++//
++//		$this->setId($rec["id"]);
++//		$this->setPluginSlots(ilComponent::lookupPluginSlots(
++//			$this->getComponentType(), $this->getName()));
+ 	}
+ 	
+ 	/**
+@@ -172,13 +185,17 @@
+ 	*/
+ 	static function lookupPluginSlots($a_type, $a_name)
+ 	{
+-		global $ilDB;
++//		global $ilDB;
+-		
++
+-		$set = $ilDB->query("SELECT * FROM il_pluginslot WHERE component = ".
+-			$ilDB->quote($a_type."/".$a_name, "text"));
+-		$ps = array();
++		$cached_component = ilCachedComponentData::getInstance();
++		$recs = $cached_component->lookupPluginSlotByComponent($a_type."/".$a_name);
++
++//		$set = $ilDB->query("SELECT * FROM il_pluginslot WHERE component = ".
++//			$ilDB->quote($a_type."/".$a_name, "text"));
++//		$ps = array();
+ //echo "<br>".$a_type."/".$a_name;
+-		while($rec = $ilDB->fetchAssoc($set))
++//		while($rec = $ilDB->fetchAssoc($set))
++		foreach($recs as $rec)
+ 		{
+ 			$rec["dir"] = "Customizing/global/plugins/".$a_type."/".$a_name."/".$rec["name"];
+ 			$rec["dir_pres"] = "Customizing/global/plugins/<br />".$a_type."/".$a_name."/".$rec["name"];
+@@ -229,14 +246,18 @@
+ 	*/
+ 	static function lookupId($a_type, $a_name)
+ 	{
+-		global $ilDB;
++		$global_cache = ilCachedComponentData::getInstance();
+-		
++
+-		$set = $ilDB->queryF("SELECT * FROM il_component WHERE type = %s ".
+-			" AND name = %s", array("text", "text"),
+-			array($a_type, $a_name));
+-		$rec = $ilDB->fetchAssoc($set);
++		return $global_cache->lookCompId($a_type, $a_name);
+-		
++
+-		return $rec["id"];
++//		global $ilDB;
++//
++//		$set = $ilDB->queryF("SELECT * FROM il_component WHERE type = %s ".
++//			" AND name = %s", array("text", "text"),
++//			array($a_type, $a_name));
++//		$rec = $ilDB->fetchAssoc($set);
++//
++//		return $rec["id"];
+ 	}
+ 	
+ 	/**
+Index: Services/Component/classes/class.ilCachedPlugin.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- Services/Component/classes/class.ilCachedPlugin.php	(revision )
++++ Services/Component/classes/class.ilCachedPlugin.php	(revision )
+@@ -0,0 +1,61 @@
++<?php
++
++/**
++ * Class ilCachedPlugin
++ *
++ * @author  Fabian Schmid <fs@studer-raimann.ch>
++ * @version 1.0.0
++ */
++abstract class ilCachedPlugin extends ilPlugin {
++
++	function updateDatabase() {
++		return parent::updateDatabase(); // TODO: Change the autogenerated stub
++	}
++
++
++	static function lookupTxt($a_mod_prefix, $a_pl_id, $a_lang_var) {
++		return parent::lookupTxt($a_mod_prefix, $a_pl_id, $a_lang_var); // TODO: Change the autogenerated stub
++	}
++
++
++	protected function init() {
++		parent::init(); // TODO: Change the autogenerated stub
++	}
++
++
++	protected function beforeActivation() {
++		return parent::beforeActivation(); // TODO: Change the autogenerated stub
++	}
++
++
++	protected function afterActivation() {
++		parent::afterActivation(); // TODO: Change the autogenerated stub
++	}
++
++
++	protected function afterDeactivation() {
++		parent::afterDeactivation(); // TODO: Change the autogenerated stub
++	}
++
++
++	protected function beforeUpdate() {
++		return parent::beforeUpdate(); // TODO: Change the autogenerated stub
++	}
++
++
++	protected function afterUpdate() {
++		parent::afterUpdate(); // TODO: Change the autogenerated stub
++	}
++
++
++	function lookupNameForId($a_ctype, $a_cname, $a_slot_id, $a_plugin_id) {
++		return parent::lookupNameForId($a_ctype, $a_cname, $a_slot_id, $a_plugin_id); // TODO: Change the autogenerated stub
++	}
++
++
++	function lookupIdForName($a_ctype, $a_cname, $a_slot_id, $a_plugin_name) {
++		return parent::lookupIdForName($a_ctype, $a_cname, $a_slot_id, $a_plugin_name); // TODO: Change the autogenerated stub
++	}
++}
++
++?>
+Index: Services/UICore/classes/class.ilCtrl.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?php\n/* Copyright (c) 1998-2012 ILIAS open source, Extended GPL, see docs/LICENSE */\n\n/**\n * This class provides processing control methods.\n * A global instance is available via variable $ilCtrl\n *\n * @author Alex Killing <alex.killing@gmx.de>\n * @version $Id: class.ilCtrl.php 41915 2013-04-30 09:24:02Z fschmid $\n */\nclass ilCtrl\n{\n\tconst IL_RTOKEN_NAME = 'rtoken';\n\t\n\tvar $target_script;\n\tvar $forward;\t\t\t// forward array\n\tvar $parent;\t\t\t// parent array (reverse forward)\n\tvar $save_parameter;\t// save parameter array\n\tvar $return;\t\t\t// return commmands\n\tvar $call_hist = array();\t// calling history\n\tvar $debug = array();\n\tvar $calls = array();\n\tvar $rtoken = false;\n\n\t/**\n\t * control class constructor\n\t */\n\tfunction ilCtrl()\n\t{\n\t\tglobal $ilBench;\n\n\t\t$this->bench =& $ilBench;\n\t\t\n\t\t// initialisation\n\t\t$this->init();\n\t\t\n\t\t// this information should go to xml files one day\n\t\t$this->stored_trees = array\n\t\t\t(\"ilrepositorygui\", \"ilpersonaldesktopgui\",\n\t\t\t\"illmpresentationgui\", \"illmeditorgui\",\n\t\t\t\"iladministrationgui\");\n\t}\n\t\n\t/**\n\t * Collect debugging strings (@deprecated)\n\t *\n\t * @param\tstring\t\tdebug message\n\t */\n\tfunction debug($str)\n\t{\n\t\t$this->debug[] = $str;\n\t}\n\t\n\t/**\n\t * Get debug message string (@deprecated)\n\t *\n\t * @return\tarray\t\tarray of debug strings\n\t */\n\tfunction getDebug()\n\t{\n\t\treturn $this->debug;\n\t}\n\t\n\t/**\n\t * initialisation\n\t */\n\tfunction init()\n\t{\n\t\t$this->transit = array();\n\t\t$this->forward = array();\t\t\t// forward array\n\t\t$this->forwards = array();\t\t\t// forward array\n\t\t$this->parent = array();\t\t\t// parent array (reverse forward)\n\t\t$this->save_parameter = array();\t// save parameter array\n\t\t$this->parameter = array();\t\t\t// save parameter array\n\t\t$this->return = \"\";\t\t\t\t\t// return commmands\n\t\t$this->location = array();\n\t\t$this->tab = array();\n\t\t$this->current_node = 0;\n\t\t$this->module_dir = \"\";\n\t\t$this->service_dir = \"\";\n\t\t$this->call_node = array();\n\t\t$this->root_class = \"\";\n\t}\n\n\t/**\n\t * Calls base class of current request. The base class is\n\t * passed via $_GET[\"baseClass\"] and is the first class in\n\t * the call sequence of the request. Do not call this method\n\t * within other scripts than ilias.php.\n\t */\n\tfunction callBaseClass()\n\t{\n\t\tglobal $ilDB;\n\t\t\n\t\t$baseClass = strtolower($_GET[\"baseClass\"]);\n\t\t\n\t\t// get class information\n\t\t$mc_set = $ilDB->query(\"SELECT * FROM module_class WHERE LOWER(class) = \".\n\t\t\t$ilDB->quote($baseClass, \"text\"));\n\t\t$mc_rec = $ilDB->fetchAssoc($mc_set);\n\t\t$module = $mc_rec[\"module\"];\n\t\t$class = $mc_rec[\"class\"];\n\t\t$class_dir = $mc_rec[\"dir\"];\n\t\t\n\t\tif ($module != \"\")\n\t\t{\n\t\t\t$m_set = $ilDB->query(\"SELECT * FROM il_component WHERE name = \".\n\t\t\t\t$ilDB->quote($module, \"text\"));\n\t\t\t$m_rec = $ilDB->fetchAssoc($m_set);\n\t\t\t$this->module_dir = $m_rec[\"type\"].\"/\".$m_rec[\"name\"];\n\t\t\tinclude_once $this->module_dir.\"/\".$class_dir.\"/class.\".$class.\".php\";\n\t\t}\n\t\telse\t\t// check whether class belongs to a service\n\t\t{\n\t\t\t$mc_set = $ilDB->query(\"SELECT * FROM service_class WHERE LOWER(class) = \".\n\t\t\t\t$ilDB->quote($baseClass, \"text\"));\n\t\t\t$mc_rec = $ilDB->fetchAssoc($mc_set);\n\n\t\t\t$service = $mc_rec[\"service\"];\n\t\t\t$class = $mc_rec[\"class\"];\n\t\t\t$class_dir = $mc_rec[\"dir\"];\n\t\t\t\n\t\t\tif ($service == \"\")\n\t\t\t{\n\t\t\t\tinclude_once(\"./Services/UICore/exceptions/class.ilCtrlException.php\");\n\t\t\t\tthrow new ilCtrlException(\"Could not find entry in modules.xml or services.xml for \".\n\t\t\t\t\t$baseClass.\" <br/>\".str_replace(\"&\", \"<br />&\", htmlentities($_SERVER[\"REQUEST_URI\"])));\n\t\t\t}\n\n\t\t\t// get service information\n\t\t\t$m_set = $ilDB->query(\"SELECT * FROM il_component WHERE name = \".\n\t\t\t\t$ilDB->quote($service, \"text\"));\n\t\t\t$m_rec = $ilDB->fetchAssoc($m_set);\n\t\t\t$this->service_dir = $m_rec[\"type\"].\"/\".$m_rec[\"name\"];\n\t\t\t\n\t\t\tinclude_once $this->service_dir.\"/\".$class_dir.\"/class.\".$class.\".php\";;\n\t\t}\n\t\t\n\t\t// forward processing to base class\n\t\t$this->getCallStructure(strtolower($baseClass));\n\t\t$base_class_gui =& new $class();\n\t\t$this->forwardCommand($base_class_gui);\n\t}\n\n\t/**\n\t* get directory of current module\n\t*/\n\tfunction getModuleDir()\n\t{\n\t\treturn $this->module_dir;\n\t}\n\t\n\t/**\n\t * Forward flow of control to next gui class\n\t * this invokes the executeCommand() method of the\n\t * gui object that is passed via reference\n\t *\n\t * @param\tobject\t\tgui object that should receive\n\t *\t\t\t\t\t\tthe flow of control\n\t * @return\tmixed\t\treturn data of invoked executeCommand() method\n\t */\n\tfunction &forwardCommand(&$a_gui_object)\n\t{\n\t\t$class = strtolower(get_class($a_gui_object));\n//echo \"<br>class:\".$class.\":\";\n\t\t$nr = $this->getNodeIdForTargetClass($this->current_node, $class);\n\t\t$nr = $nr[\"node_id\"];\n\t\tif ($nr != \"\")\n\t\t{\n\t\t\t$current_node = $this->current_node;\n\t\t\t\n\t\t\t$this->current_node = $nr;\n\n\t\t\t// always populate the call history\n\t\t\t// it will only be displayed in DEVMODE but is needed for UI plugins, too\n\t\t\t$this->call_hist[] = array(\"class\" => get_class($a_gui_object),\n\t\t\t\t\t\"mode\" => \"execComm\", \"cmd\" => $this->getCmd());\n\n//echo \"<br>class:\".get_class($a_gui_object).\":\";\n\t\t\t$html = $a_gui_object->executeCommand();\n\t\t\t\n\t\t\t// reset current node\n\t\t\t$this->current_node = $current_node;\n\t\t\t\n\t\t\treturn $html;\n\n\t\t}\n\t\t\n\t\tinclude_once(\"./Services/UICore/exceptions/class.ilCtrlException.php\");\n\t\tthrow new ilCtrlException(\"ERROR: Can't forward to class $class.\");\n\t}\n\n\t/**\n\t * Gets an HTML output from another GUI class and\n\t * returns the flow of control to the calling class.\n\t *\n\t * @param\tobject\t\tgui object that returns the HTML block\n\t * @return\tstring\t\tHTML\n\t */\n\tfunction &getHTML(&$a_gui_object)\n\t{\n\t\t$class = strtolower(get_class($a_gui_object));\n\n\t\t$nr = $this->getNodeIdForTargetClass($this->current_node, $class);\n\t\t$nr = $nr[\"node_id\"];\n\t\tif ($nr != \"\")\n\t\t{\n\t\t\t$current_node = $this->current_node;\n\t\t\t\n\t\t\t// set current node to new gui class\n\t\t\t$this->current_node = $nr;\n\t\t\t\n\t\t\t// always populate the call history\n\t\t\t// it will only be displayed in DEVMODE but is needed for UI plugins, too\n\t\t\t$this->call_hist[] = array(\"class\" => get_class($a_gui_object),\n\t\t\t\t\t\"mode\" => \"getHtml\", \"cmd\" => $this->getCmd());\n\t\t\t\n\t\t\t// get block\n\t\t\t$html = $a_gui_object->getHTML();\n\t\t\t\n\t\t\t// reset current node\n\t\t\t$this->current_node = $current_node;\n\t\t\t\n\t\t\t// return block\n\t\t\treturn $html;\n\t\t}\n\n\t\tinclude_once(\"./Services/UICore/exceptions/class.ilCtrlException.php\");\n\t\tthrow new ilCtrlException(\"ERROR: Can't getHTML from class $class.\");\n\n\t}\n\t\n\t/**\n\t * Set context of current user interface. A context is a ILIAS repository\n\t * object (obj ID + obj type) with an additional optional subobject (ID + Type)\n\t *\n\t * @param\tinteger\t\tobject ID\n\t * @param\tstring\t\tobject type\n\t * @param\tinteger\t\tsubobject ID\n\t * @param\tstring\t\tsubobject type\n\t */\n\tfunction setContext($a_obj_id, $a_obj_type, $a_sub_obj_id = 0, $a_sub_obj_type = \"\")\n\t{\n\t\t$this->context_obj_id = $a_obj_id;\n\t\t$this->context_obj_type = $a_obj_type;\n\t\t$this->context_sub_obj_id = $a_sub_obj_id;\n\t\t$this->context_sub_obj_type = $a_sub_obj_type;\n\t}\n\n\t/**\n\t * Get context object id\n\t *\n\t * @return\tint\t\tobject id\n\t */\n\tpublic function getContextObjId()\n\t{\n\t\treturn $this->context_obj_id;\n\t}\n\n\t/**\n\t * Get context object type\n\t *\n\t * @return\tstring\t\tobject type\n\t */\n\tpublic function getContextObjType()\n\t{\n\t\treturn $this->context_obj_type;\n\t}\n\n\t/**\n\t * Get context subobject id\n\t *\n\t * @return\tint\t\tsubobject id\n\t */\n\tpublic function getContextSubObjId()\n\t{\n\t\treturn $this->context_sub_obj_id;\n\t}\n\n\t/**\n\t * Get context subobject type\n\t *\n\t * @return\tstring\t\tsubobject type\n\t */\n\tpublic function getContextSubObjType()\n\t{\n\t\treturn $this->context_sub_obj_type;\n\t}\n\n\t/**\n\t * Searchs a node for a given class ($a_class) \"near\" the another\n\t * node ($a_par_node).\n\t *\n\t * It first looks if the given class is a child class of the current node.\n\t * If such a child node has been found, its id is returned.\n\t *\n\t * If not, this method determines wether the given class is a sibling\n\t * of the current node within the call structure. If this is the case\n\t * then the corresponding id is returned.\n\t *\n\t * At last the methode searchs for the given class along the path from\n\t * the current node to the root class of the call structure.\n\t *\n\t * @param\tstring\t\tid of starting node for the search\n\t * @param\tstring\t\tclass that should be searched\n\t * @return\tint\t\t\tid of target node that has been found\n\t */\n\tprivate function getNodeIdForTargetClass($a_par_node, $a_class, $a_check = false)\n\t{\n\t\t$class = strtolower($a_class);\n\t\t$this->readClassInfo($class);\n\t\t\n\t\tif ($a_par_node === 0 || $a_par_node == \"\")\n\t\t{\n\t\t\treturn array(\"node_id\" => $this->getCidForClass($class),\n\t\t\t\t\"base_class\" => \"\");\n\t\t}\n\t\t\n\t\t$this->readNodeInfo($a_par_node);\n\t\t\n\t\t$node_cid = $this->getCurrentCidOfNode($a_par_node);\n\n\t\t// target class is class of current node id\n\t\tif ($class == $this->getClassForCid($node_cid))\n\t\t{\n\t\t\treturn array(\"node_id\" => $a_par_node,\n\t\t\t\t\"base_class\" => \"\");\n\t\t}\n\n\t\t// target class is child of current node id\n\t\tif (isset($this->calls[$this->getClassForCid($node_cid)]) &&\n\t\t\tis_array($this->calls[$this->getClassForCid($node_cid)]) &&\n\t\t\tin_array($a_class, $this->calls[$this->getClassForCid($node_cid)]))\n\t\t{\n\t\t\treturn array(\"node_id\" => $a_par_node.\":\".$this->getCidForClass($class),\n\t\t\t\t\"base_class\" => \"\");\n\t\t}\n\n\t\t// target class is sibling\n\t\t$par_cid = $this->getParentCidOfNode($a_par_node);\n\t\tif ($par_cid != \"\")\n\t\t{\n\t\t\tif (is_array($this->calls[$this->getClassForCid($par_cid)]) &&\n\t\t\t\tin_array($a_class, $this->calls[$this->getClassForCid($par_cid)]))\n\t\t\t{\n\t\t\t\treturn array(\"node_id\" =>\n\t\t\t\t\t$this->removeLastCid($a_par_node).\":\".$this->getCidForClass($class),\n\t\t\t\t\t\"base_class\" => \"\");\n\t\t\t}\n\t\t}\n\n\t\t// target class is parent\n\t\t$temp_node = $this->removeLastCid($a_par_node);\n\t\twhile($temp_node != \"\")\n\t\t{\n\t\t\t$temp_cid = $this->getCurrentCidOfNode($temp_node);\n\t\t\tif ($this->getClassForCid($temp_cid) == $a_class)\n\t\t\t{\n\t\t\t\treturn array(\"node_id\" => $temp_node,\n\t\t\t\t\t\"base_class\" => \"\");\n\t\t\t}\n\t\t\t$temp_node = $this->removeLastCid($temp_node);\n\t\t}\n\t\t\n\t\t// target class is another base class\n\t\t$n_class = \"\";\n\t\tif ($a_class != \"\")\n\t\t{\n\t\t\tglobal $ilDB;\n\t\t\t\n\t\t\t// get class information\n\t\t\t$mc_set = $ilDB->query(\"SELECT * FROM module_class WHERE LOWER(class) = \".\n\t\t\t\t$ilDB->quote($class, \"text\"));\n\t\t\t$mc_rec = $ilDB->fetchAssoc($mc_set);\n\t\t\t$n_class = strtolower($mc_rec[\"class\"]);\n\n\t\t\tif ($n_class == \"\")\n\t\t\t{\n\t\t\t\t$mc_set = $ilDB->query(\"SELECT * FROM service_class WHERE LOWER(class) = \".\n\t\t\t\t\t$ilDB->quote($class, \"text\"));\n\t\t\t\t$mc_rec = $ilDB->fetchAssoc($mc_set);\n\t\t\t\t$n_class = strtolower($mc_rec[\"class\"]);\n\t\t\t}\n\t\t\t\n\t\t\tif ($n_class != \"\")\n\t\t\t{\n\t\t\t\t$this->getCallStructure($n_class);\n\t\t\t\treturn array(\"node_id\" => $this->getCidForClass($n_class),\n\t\t\t\t\t\"base_class\" => $class);\n\t\t\t}\n\t\t}\n\n\t\tif ($a_check)\n\t\t{\n\t\t\treturn false;\n\t\t}\n\t\t\n\t\t// Please do NOT change these lines.\n\t\t// Developers must be aware, if they use classes unknown to the controller\n\t\t// otherwise certain problem will be extremely hard to track down...\n\t\t\n//\t\techo \"ERROR: Can't find target class $a_class for node $a_par_node \".\n//\t\t\t\"(\".$this->cid_class[$this->getParentCidOfNode($a_par_node)].\").<br>\";\n\t\terror_log( \"ERROR: Can't find target class $a_class for node $a_par_node \".\n\t\t\t\"(\".$this->cid_class[$this->getParentCidOfNode($a_par_node)].\")\");\n\t\t\t\n\t\tif (DEVMODE == 1)\n\t\t{\n//\t\t\tilUtil::printBacktrace();\n\t\t}\n\n\t\tinclude_once(\"./Services/UICore/exceptions/class.ilCtrlException.php\");\n\t\tthrow new ilCtrlException(\"ERROR: Can't find target class $a_class for node $a_par_node \".\n\t\t\t\"(\".$this->cid_class[$this->getParentCidOfNode($a_par_node)].\").\");\n\t}\n\n\t/**\n\t * Check whether target is valid\n\t *\n\t * @param\n\t * @return\n\t */\n\tfunction checkTargetClass($a_class)\n\t{\n\t\tif (!is_array($a_class))\n\t\t{\n\t\t\t$a_class = array($a_class);\n\t\t}\n\n\t\t$nr = $this->current_node;\n\t\tforeach ($a_class as $class)\n\t\t{\n\t\t\t$class = strtolower($class);\n\n\t\t\tif (!$this->getCidForClass($class, true))\n\t\t\t{\n\t\t\t\treturn false;\n\t\t\t}\n\n\t\t\t$nr = $this->getNodeIdForTargetClass($nr, $class, true);\n\t\t\t$nr = $nr[\"node_id\"];\n\t\t\tif ($nr === false)\n\t\t\t{\n\t\t\t\treturn false;\n\t\t\t}\n\t\t}\n\t\treturn true;\n\t}\n\n\t/**\n\t * Get command target node\n\t *\n\t * @return\tstring\t\tid of current command target node\n\t */\n\tfunction getCmdNode()\n\t{\n\t\treturn $_GET[\"cmdNode\"];\n\t}\n\n\t/**\n\t * Add a location to the locator array (@deprecated, use $ilLocator)\n\t *\n\t * @param\tstring\t\t$a_title\tlink text\n\t * @param\tstring\t\t$a_link\t\tlink\n\t * @param\tstring\t\t$a_target\ttarget frame\n\t */\n\tfunction addLocation($a_title, $a_link, $a_target = \"\", $a_ref_id = 0)\n\t{\n\t\t$this->location[] = array(\"title\" => $a_title,\n\t\t\t\"link\" => $a_link, \"target\" => $a_target, \"ref_id\" => $a_ref_id);\n\t}\n\n\t/**\n\t * Get locations array (@deprecated, use $ilLocator)\n\t *\n\t * @return\tarray\tarray of locations (array(\"title\", \"link\", \"target\"))\n\t */\n\tfunction getLocations()\n\t{\n\t\treturn $this->location;\n\t}\n\n\t/**\n\t * Add a tab to tabs array (@deprecated use $ilTabs)\n\t *\n\t * @param\tstring\t\t$a_lang_var\t\tlanguage variable\n\t * @param\tstring\t\t$a_link\t\t\tlink\n\t * @param\tstring\t\t$a_cmd\t\t\tcommand (must be same as in link)\n\t * @param\tstring\t\t$a_class\t\tcommand class (must be same as in link)\n\t */\n\tfunction addTab($a_lang_var, $a_link, $a_cmd, $a_class)\n\t{\n\t\t$a_class = strtolower($a_class);\n\n\t\t$this->tab[] = array(\"lang_var\" => $a_lang_var,\n\t\t\t\"link\" => $a_link, \"cmd\" => $a_cmd, \"class\" => $a_class);\n\t}\n\n\t/**\n\t * Get tabs array\t\t(@deprecated, use $ilTabs)\n\t *\n\t * @return\tarray\t\tarray of tab entries (array(\"lang_var\", \"link\", \"cmd\", \"class))\n\t */\n\tfunction getTabs()\n\t{\n\t\treturn $this->tab;\n\t}\n\n\t/**\n\t * Get controller call history. This is used for\n\t * the developer mode and presented in the footer\n\t *\n\t * @return\tarray\t\tarray of call history entries\n\t */\n\tfunction getCallHistory()\n\t{\n\t\treturn $this->call_hist;\n\t}\n\t\n\t/**\n\t * Get call structure of class context. This method must be called\n\t * for the top level gui class in the leading php script. It must be\n\t * called before the the current command is forwarded to the top level\n\t * gui class. Example:\n\t *\n\t *\tinclude_once \"classes/class.ilRepositoryGUI.php\";\n\t *\t$ilCtrl->setTargetScript(\"ilias.php\");\n\t *\t$ilCtrl->getCallStructure(\"ilrepositorygui\");\n\t *\t$repository_gui =& new ilRepositoryGUI();\n\t *\t$ilCtrl->forwardCommand($repository_gui);\n\t *\n\t * @param\tstring\t\t$a_class\tgui class name\n\t *\n\t * @access\tpublic\n\t */\n\tfunction getCallStructure($a_class)\n\t{\n\t\t$this->readClassInfo($a_class);\n\t}\n\n\t/**\n\t* stores often used common call structures (called\n\t* from db_update script!!!)\n\t*/\n/*\tfunction storeCommonStructures()\n\t{\n\t\tglobal $ilDB;\n\t\t\n\t\t$ilDB->manipulate(\"DELETE FROM ctrl_structure\");\n\t\t\n\t\tforeach ($this->stored_trees as $root_gui_class)\n\t\t{\n\t\t\t$this->call_node = array();\n\t\t\t$this->forward = array();\n\t\t\t$this->parent = array();\n\t\t\t$this->readCallStructure($root_gui_class);\n\t\t\t$ilDB->insert(\"ctrl_structure\", array(\n\t\t\t\t\"root_class\" => array(\"text\", $root_gui_class),\n\t\t\t\t\"call_node\" => array(\"text\", serialize($this->call_node)),\n\t\t\t\t\"forward\" => array(\"text\", serialize($this->forward)),\n\t\t\t\t\"parent\" => array(\"clob\", serialize($this->parent))));\n\t\t}\n\t}\n*/\n\t\n\t/**\n\t * Reads call structure from db\n\t */\n\tfunction readCallStructure($a_class, $a_nr = 0, $a_parent = 0)\n\t{\n\t\tglobal $ilDB;\n\n\t\t$a_class = strtolower($a_class);\n\n\t\t$a_nr++;\n\t\t\n\t\t// determine call node structure\n\t\t$this->call_node[$a_nr] = array(\"class\" => $a_class, \"parent\" => $a_parent);\n\t\t\n//echo \"<br>nr:$a_nr:class:$a_class:parent:$a_parent:\";\n\t\t$call_set = $ilDB->query(\"SELECT * FROM ctrl_calls WHERE parent = \".\n\t\t\t$ilDB->quote(strtolower($a_class), \"text\").\n\t\t\t\" ORDER BY child\", array(\"text\"));\n\t\t$a_parent = $a_nr;\n\t\twhile ($call_rec = $ilDB->fetchAssoc($call_set))\n\t\t{\n\t\t\t$a_nr = $this->readCallStructure($call_rec[\"child\"], $a_nr, $a_parent);\n\t\t\t$forw[] = $call_rec[\"child\"];\n\t\t}\n\t\t\n\t\t// determin forward and parent array\n\t\t$this->forwards($a_class, $forw);\n//echo \"<br>forwards:\".$a_class.\"<br>\"; var_dump($forw);\n\n\t\t// determine root class\n\t\t$this->root_class = $a_class;\n\t\treturn $a_nr;\n\t}\n\n\n\t/**\n\t * Stores which classes forwards commands to which other classes.\n\t *\n\t * @param\tstring\t$a_from_class\tsource class name\n\t * @param\tstring\t$a_to_class\t\ttarget class name\n\t */\n\tprivate function forwards($a_from_class, $a_to_class)\n\t{\n\t\t$a_from_class = strtolower($a_from_class);\n\n\t\tif (is_array($a_to_class))\n\t\t{\n\t\t\tforeach($a_to_class as $to_class)\n\t\t\t{\n\t\t\t\tif ($a_from_class != \"\" && $to_class != \"\")\n\t\t\t\t{\n\t\t\t\t\tif (!is_array($this->forward[$a_from_class]) || !in_array(strtolower($to_class), $this->forward[$a_from_class]))\n\t\t\t\t\t{\n\t\t\t\t\t\t$this->forward[$a_from_class][] = strtolower($to_class);\n\t\t\t\t\t}\n\t\t\t\t\tif (!is_array($this->parent[strtolower($to_class)]) || !in_array($a_from_class, $this->parent[strtolower($to_class)]))\n\t\t\t\t\t{\n\t\t\t\t\t\t$this->parent[strtolower($to_class)][] = $a_from_class;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\telse\n\t\t{\n\t\t\t$to_class = $a_to_class;\n\t\t\tif ($a_from_class != \"\" && $to_class != \"\")\n\t\t\t{\n\t\t\t\tif (!is_array($this->forward[$a_from_class]) || !in_array(strtolower($to_class), $this->forward[$a_from_class]))\n\t\t\t\t{\n\t\t\t\t\t$this->forward[$a_from_class][] = strtolower($to_class);\n\t\t\t\t}\n\t\t\t\tif (!is_array($this->parent[strtolower($to_class)]) || !in_array($a_from_class, $this->parent[strtolower($to_class)]))\n\t\t\t\t{\n\t\t\t\t\t$this->parent[strtolower($to_class)][] = $a_from_class;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\n\n\t/**\n\t * Set parameters that should be passed in every form and link of a\n\t * gui class. All links that relate to the specified gui object class and\n\t * are build e.g. by using getLinkTarger() or getFormAction() will include\n\t * this parameter. This is the mechanism to add url parameters to the standard\n\t * url (which is set by the setTargetScript() method) target everytime.\n\t *\n\t * A typical example is the \"ref_id\" that should be included in almost every\n\t * link or form action url. So the constructor of ilRepositoryGUI includes\n\t * the command:\n\t *\n\t *\t$this->ctrl->saveParameter($this, array(\"ref_id\"));\n\t *\n\t * @param\tobject\t$a_obj\t\t\tgui object that will process the parameter\n\t * @param\tmixed\t$a_parameter\tparameter name (string) or array of parameter\n\t *\t\t\t\t\t\t\t\t\tnames\n\t *\n\t * @access\tpublic\n\t */\n\tpublic function saveParameter(&$a_obj, $a_parameter)\n\t{\n\t\tif (is_object($a_obj))\n\t\t{\n\t\t\t$this->saveParameterByClass(get_class($a_obj), $a_parameter);\n\t\t}\n\t}\n\t\n\t/**\n\t * Save parameter for a class\n\t *\n\t * @param\tstring\tclass name\n\t * @param\tstring\tparameter name\n\t */\n\tfunction saveParameterByClass($a_class, $a_parameter)\n\t{\n\t\tif (is_array($a_parameter))\n\t\t{\n\t\t\tforeach($a_parameter as $parameter)\n\t\t\t{\n\t\t\t\t$this->save_parameter[strtolower($a_class)][] = $parameter;\n\t\t\t}\n\t\t}\n\t\telse\n\t\t{\n\t\t\t$this->save_parameter[strtolower($a_class)][] = $a_parameter;\n\t\t}\n\t}\n\n\n\t/**\n\t * Set parameters that should be passed a form and link of a\n\t * gui class. All links that relate to the specified gui object class and\n\t * are build e.g. by using getLinkTarger() or getFormAction() will include\n\t * this parameter. This is the mechanism to add url parameters to the standard\n\t * url (which is set by the setTargetScript() method) target. The difference\n\t * to the saveParameter() method is, that setParameter() does not simply\n\t * forward the url parameter of the last request. You can set a spefific value.\n\t *\n\t * If this parameter is also a \"saved parameter\" (set by saveParameter() method)\n\t * the saved value will be overwritten.\n\t *\n\t * The method is usually used in conjunction with a getFormAction() or getLinkTarget()\n\t * call. E.g.:\n\t *\n\t *\t\t$this->ctrl->setParameter($this, \"obj_id\", $data_row[\"obj_id\"]);\n\t *\t\t$obj_link = $this->ctrl->getLinkTarget($this, \"view\");\n\t *\n\t * @param\tobject\t\t$a_obj\t\t\tgui object\n\t * @param\tstring\t\t$a_parameter\tparameter name\n\t * @param\tstring\t\t$a_parameter\tparameter value\n\t */\n\tpublic function setParameter(&$a_obj, $a_parameter, $a_value)\n\t{\n\t\t$this->parameter[strtolower(get_class($a_obj))][$a_parameter] = $a_value;\n\t}\n\n\n\t/**\n\t * Same as setParameterByClass, except that a class name is passed.\n\t *\n\t * @param\tstring\t\t$a_class\t\tgui class name\n\t * @param\tstring\t\t$a_parameter\tparameter name\n\t * @param\tstring\t\t$a_parameter\tparameter value\n\t */\n\tpublic function setParameterByClass($a_class, $a_parameter, $a_value)\n\t{\n\t\t$this->parameter[strtolower($a_class)][$a_parameter] = $a_value;\n\t}\n\t\n\t\n\t/**\n\t * Clears all parameters that have been set via setParameter for\n\t * a GUI class.\n\t *\n\t * @param\tobject\t\t$a_obj\t\t\tgui object\n\t */\n\tpublic function clearParameters(&$a_obj)\n\t{\n\t\t$this->clearParametersByClass(strtolower(get_class($a_obj)));\n\t}\n\n\t/**\n\t * Clears all parameters that have been set via setParameter for\n\t * a GUI class.\n\t *\n\t * @param\tstring\t\t$a_class\t\tgui class name\n\t */\n\tpublic function clearParametersByClass($a_class)\n\t{\n\t\t$this->parameter[strtolower($a_class)] = array();\n\t}\n\n\t/**\n\t * Get next class in the control path from the current class\n\t * to the target command class. This is the class that should\n\t * be instantiated and be invoked via $ilCtrl->forwardCommand($class)\n\t * next.\n\t *\n\t * @return\tstring\t\tclass name of next class\n\t */\n\tfunction getNextClass()\n\t{\n\t\t$cmdNode = $this->getCmdNode();\n//echo \"<br>getNextClass (current node: \".$this->current_node.\"; cmd node: \".$cmdNode.\") \";\n\t\tif ($cmdNode == \"\")\n\t\t{\n\t\t\treturn false;\n\t\t}\n\t\telse\n\t\t{\n\t\t\tif ($this->current_node == $cmdNode)\n\t\t\t{\n//echo \"1:\".$this->call_node[$cmdNode][\"class\"].\"<br>\";\n\t\t\t\t//return $this->call_node[$cmdNode][\"class\"];\n\t\t\t\treturn \"\";\n\t\t\t}\n\t\t\telse\n\t\t\t{\n\t\t\t\t$path = $this->getPathNew($this->current_node, $cmdNode);\n//var_dump($path);\n//echo \" - Next Node: \".$path[1];\n\t\t\t\t$this->readCidInfo($this->getCurrentCidOfNode($path[1]));\n//echo \":\".$this->cid_class[$this->getCurrentCidOfNode($path[1])].\":\".$this->getCurrentCidOfNode($path[1]).\":\";\n\t\t\t\treturn $this->cid_class[$this->getCurrentCidOfNode($path[1])];\n\t\t\t}\n\t\t}\n\t}\n\n\t/**\n\t * Get class path that can be used in include statements\n\t * for a given class name.\n\t *\n\t * @param\tstring\t\t$a_class_name\t\tclass name\n\t */\n\tfunction lookupClassPath($a_class_name)\n\t{\n\t\tglobal $ilDB;\n\t\t$a_class_name = strtolower($a_class_name);\n\n\t\t$class_set = $ilDB->query(\"SELECT * FROM ctrl_classfile WHERE class = \".\n\t\t\t$ilDB->quote($a_class_name, \"text\"));\n\t\t$class_rec = $ilDB->fetchAssoc($class_set);\n\n\t\tif ($class_rec[\"plugin_path\"] != \"\")\n\t\t{\n\t\t\treturn $class_rec[\"plugin_path\"].\"/\".$class_rec[\"filename\"];\n\t\t}\n\t\telse\n\t\t{\n\t\t\treturn $class_rec[\"filename\"];\n\t\t}\n\t}\n\n\t/**\n\t * this method assumes that the class path has the format \"dir/class.<class_name>.php\"\n\t *\n\t * @param\tstring\t\t$a_class_path\t\tclass path\n\t * @access\tpublic\n\t *\n\t * @return\tstring\t\tclass name\n\t */\n\tfunction getClassForClasspath($a_class_path)\n\t{\n\t\t$path = pathinfo($a_class_path);\n\t\t$file = $path[\"basename\"];\n\t\t$class = substr($file, 6, strlen($file) - 10);\n\n\t\treturn $class;\n\t}\n\n\t/**\n\t * Get path in call structure.\n\t *\n\t * @param\tstring\t\t$a_source_node\t\tsource node id\n\t * @param\tstring\t\t$a_source_node\t\ttarget node id\n\t */\n\tprivate function getPathNew($a_source_node, $a_target_node)\n\t{\n//if ($this->getCmdClass() == \"ilmailfoldergui\") echo \"-\".$a_source_node.\"-\".$a_target_node.\"-\";\n//echo \"-\".$a_source_node.\"-\".$a_target_node.\"-\";\n//echo \"<br>:::$a_source_node:::\";\n\t\tif ($a_source_node == \"1\")\n\t\t{\n\t\t\t$a_source_node = \"\";\n\t\t}\n\t\tif (substr($a_target_node, 0, strlen($a_source_node)) != $a_source_node)\n\t\t{\n\t\t\t$failure =  \"ERROR: Path not found. Source:\".$a_source_node.\n\t\t\t\t\", Target:\".$a_target_node;\n\t\t\tif (DEVMODE == 1)\n\t\t\t{\n\t\t\t\tinclude_once(\"./Services/UICore/exceptions/class.ilCtrlException.php\");\n\t\t\t\tthrow new ilCtrlException($failure);\n\t\t\t}\n\t\t\t$GLOBALS['ilLog']->write(__METHOD__.' '.$failure);\n\t\t\tilUtil::redirect('./ilias.php?baseClass=ilRepositoryGUI');\n\t\t}\n//echo \"<br>:::$a_source_node:::\";\n\t\t$temp_node = $a_source_node;\n\t\t\n\t\t$path = array();\n\t\tif ($a_source_node != \"\")\n\t\t{\n\t\t\t$path = array($a_source_node);\n\t\t}\n\t\t\n\t\t$diffstart = ($a_source_node == \"\")\n\t\t\t? 0\n\t\t\t: strlen($a_source_node) + 1;\n\t\t$diff = substr($a_target_node, $diffstart);\n//echo \"=$diff=$diffstart=\";\n\t\t$diff_arr = explode(\":\", $diff);\n\t\tforeach($diff_arr as $cid)\n\t\t{\n\t\t\tif ($temp_node != \"\")\n\t\t\t{\n\t\t\t\t$temp_node.= \":\";\n\t\t\t}\n\t\t\t$temp_node.= $cid;\n\t\t\t$path[] = $temp_node;\n\t\t}\n//if ($this->getCmdClass() == \"ilmailfoldergui\") var_dump($path);\n//var_dump($path);\n\t\treturn $path;\n\t}\n\n\t/**\n\t * set target script name\n\t *\n\t * @param\tstring\t\t$a_target_script\t\ttarget script name\n\t */\n\tpublic function setTargetScript($a_target_script)\n\t{\n\t\t$this->target_script = $a_target_script;\n\t}\n\n\n\t/**\n\t * Get target script name\n\t *\n\t * @return\tstring\t\ttarget script name\n\t */\n\tpublic function getTargetScript()\n\t{\n\t\treturn $this->target_script;\n\t}\n\n\n\t/**\n\t * Initialises new base class\n\t *\n\t * Note: this resets the whole current ilCtrl context completely.\n\t * You can call setTargetScript() and callBaseClass() after that.\n\t *\n\t * @param\tstring\t\tbase class name\n\t */\n\tpublic function initBaseClass($a_base_class)\n\t{\n\t\t$_GET[\"baseClass\"] = $a_base_class;\n\t\t$_GET[\"cmd\"] = \"\";\n\t\t$_GET[\"cmdClass\"] = \"\";\n\t\t$_GET[\"cmdNode\"] = \"\";\n\t\t$this->init();\n\t}\n\t\n\t/**\n\t * Determines current get/post command\n\t *\n\t * @param\tstring\t\tdefault command\n\t * @param\tarray\t\tsafe commands: for these commands no token\n\t *\t\t\t\t\t\tis checked for post requests\n\t */\n\tpublic function getCmd($a_default_cmd = \"\", $a_safe_commands = \"\")\n\t{\n\t\t$cmd = \"\";\n\t\tif (isset($_GET[\"cmd\"]))\n\t\t{\n\t\t\t$cmd = $_GET[\"cmd\"];\n\t\t}\n\t\tif($cmd == \"post\")\n\t\t{\n\t\t\tif (isset($_POST[\"cmd\"]) && is_array($_POST[\"cmd\"]))\n\t\t\t{\n\t\t\t\treset($_POST[\"cmd\"]);\n\t\t\t}\n\t\t\t$cmd = @key($_POST[\"cmd\"]);\n\n\t\t\t// verify command\n\t\t\tif ($this->verified_cmd != \"\")\n\t\t\t{\n\t\t\t\treturn $this->verified_cmd;\n\t\t\t}\n\t\t\telse\n\t\t\t{\n\t\t\t\tif (!$this->verifyToken() &&\n\t\t\t\t\t(!is_array($a_safe_commands) || !in_array($cmd, $a_safe_commands)))\n\t\t\t\t{\n\t\t\t\t\treturn $a_default_cmd;\n\t\t\t\t}\n\t\t\t}\n\t\t\t\n\t\t\t$this->verified_cmd = $cmd;\n\t\t\tif($cmd == \"\" && isset($_POST[\"table_top_cmd\"]))\t\t// selected command in multi-list (table2)\n\t\t\t{\n\t\t\t\t$cmd = @key($_POST[\"table_top_cmd\"]);\n\t\t\t\t$this->verified_cmd = $cmd;\n\t\t\t\t$_POST[$_POST[\"cmd_sv\"][$cmd]] = $_POST[$_POST[\"cmd_sv\"][$cmd].\"_2\"];\n\t\t\t}\n\t\t\tif($cmd == \"\" && isset($_POST[\"select_cmd2\"]))\t\t// selected command in multi-list (table2)\n\t\t\t{\n\t\t\t\tif(isset($_POST[\"select_cmd_all2\"]))\n\t\t\t\t{\n\t\t\t\t\t$_POST[\"select_cmd_all\"] = $_POST[\"select_cmd_all2\"];\n\t\t\t\t}\n\t\t\t\telse\n\t\t\t\t{\n\t\t\t\t\t$_POST[\"select_cmd_all\"] = $_POST[\"select_cmd_all2\"] = null;\n\t\t\t\t}\t\t\t\t\n\t\t\t\t$cmd = $_POST[\"selected_cmd2\"];\n\t\t\t\t$this->verified_cmd = $cmd;\n\t\t\t}\n\t\t\tif($cmd == \"\" && isset($_POST[\"select_cmd\"]))\t\t// selected command in multi-list (table2)\n\t\t\t{\n\t\t\t\tif(isset($_POST[\"select_cmd_all\"]))\n\t\t\t\t{\n\t\t\t\t\t$_POST[\"select_cmd_all2\"] = $_POST[\"select_cmd_all\"];\n\t\t\t\t}\n\t\t\t\telse\n\t\t\t\t{\n\t\t\t\t\t$_POST[\"select_cmd_all\"] = $_POST[\"select_cmd_all2\"] = null;\n\t\t\t\t}\t\t\t\t\n\t\t\t\t$cmd = $_POST[\"selected_cmd\"];\n\t\t\t\t$this->verified_cmd = $cmd;\n\t\t\t}\n\t\t\tif($cmd == \"\")\n\t\t\t{\n\t\t\t\t$cmd = $_GET[\"fallbackCmd\"];\n\t\t\t\t$this->verified_cmd = $cmd;\n\t\t\t}\n\t\t}\n\t\tif($cmd == \"\")\n\t\t{\n\t\t\t$cmd = $a_default_cmd;\n\t\t}\n\t\treturn $cmd;\n\t}\n\n\t/**\n\t * Set the current command\n\t *\n\t * IMPORTANT NOTE:\n\t *\n\t * please use this function only in exceptional cases\n\t * it is not intended for setting commands in forms or links!\n\t * use the corresponding parameters of getFormAction() and\n\t * getLinkTarget() instead.\n\t */\n\tfunction setCmd($a_cmd)\n\t{\n\t\t$_GET[\"cmd\"] = $a_cmd;\n\t}\n\n\t/**\n\t * Set the current command class\n\t *\n\t * IMPORTANT NOTE:\n\t *\n\t * please use this function only in exceptional cases\n\t * it is not intended for setting the command class in forms or links!\n\t * use the corresponding parameters of getFormAction() and\n\t * getLinkTarget() instead.\n\t */\n\tpublic function setCmdClass($a_cmd_class)\n\t{\n\t\t$a_cmd_class = strtolower($a_cmd_class);\n\t\t$nr = $this->getNodeIdForTargetClass($this->current_node, $a_cmd_class);\n\t\t$nr = $nr[\"node_id\"];\n\t\t$_GET[\"cmdClass\"] = $a_cmd_class;\n\t\t$_GET[\"cmdNode\"] = $nr;\n\t}\n\n\t/**\n\t * Determines class that should execute the current command\n\t *\n\t * @return\tstring\t\tclass name\n\t */\n\tfunction getCmdClass()\n\t{\n\t\treturn strtolower($_GET[\"cmdClass\"]);\n\t}\n\n\t/**\n\t * Get form action url for gui class object\n\t *\n\t * @param\tobject\t\tgui object\n\t * @param\tstring\t\tfallback command\n\t * @param\tstring\t\tanchor\n\t * @param\tbool\t\tasynchronous call\n\t * @param\tbool\t\txml style t/f\n\t * @return\tstring\t\tscript url\n\t */\n\tfunction getFormAction(&$a_gui_obj, $a_fallback_cmd = \"\", $a_anchor = \"\", $a_asynch = false,\n\t\t$xml_style = true)\n\t{\n\t\t$script =  $this->getFormActionByClass(strtolower(get_class($a_gui_obj)),\n\t\t\t$a_fallback_cmd, $a_anchor, $a_asynch, $xml_style);\n\t\treturn $script;\n\t}\n\n\t/**\n\t * Get form action url for gui class name\n\t *\n\t * @param\tstring\t\tgui class name\n\t * @param\tstring\t\tfallback command\n\t * @param\tstring\t\tanchor\n\t * @param\tbool\t\tasynchronous call\n\t * @param\tbool\t\txml style t/f\n\t * @return\tstring\t\tscript url\n\t */\n\tfunction getFormActionByClass($a_class, $a_fallback_cmd = \"\", $a_anchor = \"\", $a_asynch = false,\n\t\t$xml_style = true)\n\t{\n\t\tif(!is_array($a_class))\n\t\t{\n\t\t\t$a_class = strtolower($a_class);\n\t\t}\n\t\t\n\t\t$tok = $this->getRequestToken();\n\n\t\tif ($a_asynch)\n\t\t{\n\t\t\t$xml_style = false;\n\t\t}\n\n\t\t$script = $this->getLinkTargetByClass($a_class, \"post\", \"\", $a_asynch);\n\t\tif ($a_fallback_cmd != \"\")\n\t\t{\n\t\t\t$script = ilUtil::appendUrlParameterString($script, \"fallbackCmd=\".$a_fallback_cmd, $xml_style);\n\t\t}\n\t\t$script = ilUtil::appendUrlParameterString($script, self::IL_RTOKEN_NAME.'='.$this->getRequestToken(),\n\t\t\t$xml_style);\n\t\tif ($a_anchor != \"\")\n\t\t{\n\t\t\t$script = $script.\"#\".$a_anchor;\n\t\t}\n\n\t\treturn $script;\n\t}\n\t\n\t/**\n\t * Append request token as url parameter\n\t *\n\t * @param\tstring\turl\n\t * @param\tboolean\txml style\n\t */\n\tpublic function appendRequestTokenParameterString($a_url, $xml_style = true)\n\t{\n\t\treturn ilUtil::appendUrlParameterString($a_url, self::IL_RTOKEN_NAME.'='.$this->getRequestToken(),\n\t\t\t$xml_style);\n\t}\n\t\n\t/**\n\t * Get request token.\n\t *\n\t * @return\tstring\t\trequest token for user and session\n\t */\n\tpublic function getRequestToken()\n\t{\n\t\tglobal $ilDB, $ilUser;\n\t\t\n\t\tif ($this->rtoken != \"\")\n\t\t{\n\t\t\treturn $this->rtoken;\n\t\t}\n\t\telse\n\t\t{\n\t\t\tif (is_object($ilDB) && is_object($ilUser) && $ilUser->getId() > 0 &&\n\t\t\t\t$ilUser->getId() != ANONYMOUS_USER_ID)\n\t\t\t{\n\t\t\t\t$res = $ilDB->query(\"SELECT token FROM il_request_token WHERE user_id = \".\n\t\t\t\t\t$ilDB->quote($ilUser->getId(), \"integer\").\n\t\t\t\t\t\" AND session_id = \".$ilDB->quote(session_id(), \"text\"));\n\t\t\t\t$rec = $ilDB->fetchAssoc($res);\n\t\t\t\t\n\t\t\t\tif ($rec[\"token\"] != \"\")\n\t\t\t\t{\n\t\t\t\t\t$this->rtoken = $rec[\"token\"];\n\t\t\t\t\treturn $rec[\"token\"];\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t$this->rtoken = md5(uniqid(rand(), true));\n\t\t\t\t\n\t\t\t\t// delete entries older than one and a half days\n\t\t\t\tif (rand(1, 200) == 2)\n\t\t\t\t{\n\t\t\t\t\t$dt = new ilDateTime(time(),IL_CAL_UNIX);\n\t\t\t\t\t$dt->increment(IL_CAL_DAY, -1);\n\t\t\t\t\t$dt->increment(IL_CAL_HOUR, -12);\n\t\t\t\t\t$dq = \"DELETE FROM il_request_token WHERE \".\n\t\t\t\t\t\t\" stamp < \".$ilDB->quote($dt->get(IL_CAL_DATETIME), \"timestamp\");\n\t\t\t\t\t$ilDB->manipulate($dq);\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t// IMPORTANT: Please do NOT try to move this implementation to a\n\t\t\t\t// session basis. This will fail due to framesets that are used\n\t\t\t\t// occasionally in ILIAS, e.g. in the chat, where multiple\n\t\t\t\t// forms are loaded in different frames.\n\t\t\t\t$ilDB->manipulate(\"INSERT INTO il_request_token (user_id, token, stamp, session_id) VALUES \".\n\t\t\t\t\t\"(\".\n\t\t\t\t\t$ilDB->quote($ilUser->getId(), \"integer\").\",\".\n\t\t\t\t\t$ilDB->quote($this->rtoken, \"text\").\",\".\n\t\t\t\t\t$ilDB->now().\",\".\n\t\t\t\t\t$ilDB->quote(session_id(), \"text\").\")\");\n\t\t\t\treturn $this->rtoken;\n\t\t\t}\n\t\t\t//$this->rtoken = md5(uniqid(rand(), true));\n\t\t}\n\t\treturn \"\";\n\t}\n\t\n\t/**\n\t * Verify Token\n\t *\n\t * @return\tboolean\t\tvalid t/f\n\t */\n\tprivate function verifyToken()\n\t{\n\t\tglobal $ilDB, $ilUser;\n\n\t\tif (is_object($ilUser) && is_object($ilDB) && $ilUser->getId() > 0 &&\n\t\t\t$ilUser->getId() != ANONYMOUS_USER_ID)\n\t\t{\n\t\t\tif ($_GET[\"rtoken\"] == \"\")\n\t\t\t{\n\t\t\t\t#echo \"ilCtrl::No Request Token Given!\";\t\t// for debugging, maybe changed later\n\t\t\t\treturn false;\n\t\t\t}\n\n\t\t\t$set = $ilDB->query(\"SELECT * FROM il_request_token WHERE \".\n\t\t\t\t\" user_id = \".$ilDB->quote($ilUser->getId(), \"integer\").\" AND \".  \t \t \n\t\t\t\t\" token = \".$ilDB->quote($_GET[self::IL_RTOKEN_NAME]), \"text\"); \t\t \n\t\t\tif ($ilDB->numRows($set) > 0) \t\t \n\t\t\t{\n\t\t\t\t// remove used token\n\t\t\t\t/*\n\t\t\t\t$ilDB->query(\"DELETE FROM il_request_token WHERE \". \t\t \n\t\t\t\t\t\" user_id = \".$ilDB->quote($ilUser->getId()).\" AND \". \t\t \n\t\t\t\t\t\" token = \".$ilDB->quote($_GET[self::IL_RTOKEN_NAME]));\n\t\t\t\t*/\n\n\t\t\t\t// remove tokens from older sessions\n\t\t\t\t$ilDB->manipulate(\"DELETE FROM il_request_token WHERE \". \t\t \n\t\t\t\t\t\" user_id = \".$ilDB->quote($ilUser->getId(), \"integer\").\" AND \". \t\t \n\t\t\t\t\t\" session_id != \".$ilDB->quote(session_id(), \"text\"));\n\t\t\t\treturn true; \t\t \n\t\t\t} \t\t \n\t\t\telse\n\t\t\t{\n\t\t\t\treturn false;\n\t\t\t}\n\t\t\t\n\t\t\tif ($_SESSION[\"rtokens\"][$_GET[self::IL_RTOKEN_NAME]] != \"\")\n\t\t\t{\n\t\t\t\t// remove used token\n\t\t\t\tunset($_SESSION[\"rtokens\"][$_GET[self::IL_RTOKEN_NAME]]);\n\t\t\t\t\n\t\t\t\t// remove old tokens\n\t\t\t\tif (count($_SESSION[\"rtokens\"]) > 100)\n\t\t\t\t{\n\t\t\t\t\t$to_remove = array();\n\t\t\t\t\t$sec = 7200;\t\t\t// two hours\n\n\t\t\t\t\tforeach($_SESSION[\"rtokens\"] as $tok => $time)\n\t\t\t\t\t{\n\t\t\t\t\t\tif (time() - $time > $sec)\n\t\t\t\t\t\t{\n\t\t\t\t\t\t\t$to_remove[] = $tok;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t\tforeach($to_remove as $tok)\n\t\t\t\t\t{\n\t\t\t\t\t\tunset($_SESSION[\"rtokens\"][$tok]);\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\treturn true;\n\t\t\t}\n\t\t\treturn false;\n\t\t}\n\t\telse\n\t\t{\n\t\t\treturn true;\t\t// do not verify, if user or db object is missing\n\t\t}\n\t\t\n\t\treturn false;\n\t}\n\n\t/**\n\t * Redirect to another command\n\t *\n\t * @param\tobject\t\tgui object\n\t * @param\tstring\t\tcommand\n\t * @param\tstring\t\tanchor\n\t */\n\tpublic function redirect(&$a_gui_obj, $a_cmd = \"\", $a_anchor = \"\", $a_asynch = false)\n\t{\n\t\tglobal $ilBench;\n\t\t\n\t\t$script = $this->getLinkTargetByClass(strtolower(get_class($a_gui_obj)), $a_cmd,\n\t\t\t\"\", $a_asynch, false);\n\t\tif  (is_object($ilBench))\n\t\t{\n\t\t\t$ilBench->save();\n\t\t}\n\t\tif ($a_anchor != \"\")\n\t\t{\n\t\t\t$script = $script.\"#\".$a_anchor;\n\t\t}\n\t\tilUtil::redirect($script);\n\t}\n\n\n\t/**\n\t * Redirect to other gui class using class name\n\t *\n\t * @param\tstring\t\tcommand target class\n\t * @param\tstring\t\tcommand\n\t */\n\tpublic function redirectByClass($a_class, $a_cmd = \"\", $a_anchor = \"\", $a_asynch = false)\n\t{\n\t\t$script = $this->getLinkTargetByClass($a_class, $a_cmd, \"\", $a_asynch, false);\n\t\tif ($a_anchor != \"\")\n\t\t{\n\t\t\t$script = $script.\"#\".$a_anchor;\n\t\t}\n\t\tilUtil::redirect($script);\n\t}\n\t\n\t/**\n\t * Is current command an asynchronous command?\n\t *\n\t * @return\tboolean\t\tasynchronous t/f\n\t */\n\tpublic function isAsynch()\n\t{\n\t\tif (isset($_GET[\"cmdMode\"]) && $_GET[\"cmdMode\"] == \"asynch\")\n\t\t{\n\t\t\treturn true;\n\t\t}\n\t\telse\n\t\t{\n\t\t\treturn false;\n\t\t}\n\t}\n\n\n\t/**\n\t * Get link target for command using gui object\n\t *\n\t * @param\tobject\t\tgui object (usually $this)\n\t * @param\tstring\t\tcommand\n\t * @param\tstring\t\t# anchor\n\t * @param\tboolean\t\tasynchronous mode\n\t * @param\tboolean\t\txml style t/f\n\t *\n\t * @return\tstring\t\ttarget link\n\t */\n\tfunction getLinkTarget(&$a_gui_obj, $a_cmd = \"\", $a_anchor = \"\", $a_asynch = false,\n\t\t$xml_style = true)\n\t{\n\t\t$script = $this->getLinkTargetByClass(strtolower(get_class($a_gui_obj)), $a_cmd, $a_anchor, $a_asynch,\n\t\t\t$xml_style);\n\t\treturn $script;\n\t}\n\n\n\t/**\n\t * Get link target for command using gui class name\n\t *\n\t * @param\tstring/array\t\tcommand target class\n\t * @param\tstring\t\tcommand\n\t * @param\tstring\t\t# anchor\n\t * @param\tboolean\t\tasynchronous mode\n\t * @param\tboolean\t\txml style t/f\n\t *\n\t * @return\tstring\t\ttarget link\n\t */\n\tfunction getLinkTargetByClass($a_class, $a_cmd  = \"\", $a_anchor = \"\", $a_asynch = false,\n\t\t$xml_style = true)\n\t{\n\t\tif ($a_asynch)\n\t\t{\n\t\t\t$xml_style = false;\n\t\t}\n\t\t\n\t\t// note: $a_class may be an array\n\t\t//$a_class = strtolower($a_class);\n\n//echo \"<br>getLinkTargetByClass\";\n\t\t$script = $this->getTargetScript();\n\t\t$script = $this->getUrlParameters($a_class, $script, $a_cmd, $xml_style);\n\n\t\tif ($a_asynch)\n\t\t{\n\t\t\t//$amp = $xml_style\n\t\t\t//\t? \"&amp;\"\n\t\t\t//\t: \"&\";\n\t\t\t$amp = \"&\";\n\t\t\t$script.= $amp.\"cmdMode=asynch\";\n\t\t}\n\t\t\n\t\tif ($a_anchor != \"\")\n\t\t{\n\t\t\t$script = $script.\"#\".$a_anchor;\n\t\t}\n\n\t\treturn $script;\n\t}\n\n\t/**\n\t * Set return command\n\t */\n\tfunction setReturn(&$a_gui_obj, $a_cmd)\n\t{\n\t\t$script = $this->getTargetScript();\n\t\t$script = $this->getUrlParameters(strtolower(get_class($a_gui_obj)), $script, $a_cmd);\n//echo \"<br>setReturn:\".get_class($a_gui_obj).\":\".$script.\":<br>\";\n\t\t$this->return[strtolower(get_class($a_gui_obj))] = $script;\n\t}\n\n\t/**\n\t * Set return command\n\t */\n\tfunction setReturnByClass($a_class, $a_cmd)\n\t{\n\t\t// may not be an array!\n\t\t$a_class = strtolower($a_class);\n\n\t\t$script = $this->getTargetScript();\n\t\t$script = $this->getUrlParameters($a_class, $script, $a_cmd);\n//echo \"<br>setReturn:\".get_class($a_gui_obj).\":\".$script.\":<br>\";\n\t\t$this->return[strtolower($a_class)] = $script;\n\t}\n\n\t/**\n\t * Redirects to next parent class that used setReturn\n\t */\n\tfunction returnToParent(&$a_gui_obj, $a_anchor = \"\")\n\t{\n\t\t$script = $this->getParentReturn($a_gui_obj);\n\n\t\t$script = ilUtil::appendUrlParameterString($script,\n\t\t\t\"redirectSource=\".strtolower(get_class($a_gui_obj)));\n\t\t$script = ilUtil::appendUrlParameterString($script,\n\t\t\t\"cmdMode=\".$_GET[\"cmdMode\"]);\n\t\tif ($a_anchor != \"\")\n\t\t{\n\t\t\t$script = $script.\"#\".$a_anchor;\n\t\t}\n\n\t\tilUtil::redirect($script);\n\t}\n\n\n\t/**\n\t * Get current redirect source\n\t *\n\t * @return\tstring\t\tredirect source class\n\t */\n\tfunction getRedirectSource()\n\t{\n\t\treturn $_GET[\"redirectSource\"];\n\t}\n\n\t/**\n\t * Get return script url\n\t */\n\tfunction getParentReturn(&$a_gui_obj)\n\t{\n\t\treturn $this->getParentReturnByClass(strtolower(get_class($a_gui_obj)));\n\t}\n\n\n\t/**\n\t * Get return script url\n\t */\n\tfunction getParentReturnByClass($a_class)\n\t{\n\t\t$a_class = strtolower($a_class);\n\t\t$ret_class = $this->searchReturnClass($a_class);\n//echo \":$ret_class:\";\n\t\tif($ret_class)\n\t\t{\n//echo \":\".$this->return[$ret_class].\":\";\n\t\t\treturn $this->return[$ret_class];\n\t\t}\n\t}\n\n\t/**\n\t * Get return class\n\t *\n\t * @param\n\t * @return\n\t */\n\tfunction getReturnClass($a_class)\n\t{\n\t\tif (is_object($a_class))\n\t\t{\n\t\t\t$class = strtolower(get_class($a_class));\n\t\t}\n\t\telse\n\t\t{\n\t\t\t$class = strtolower($a_class);\n\t\t}\n\t\treturn $this->searchReturnClass($class);\n\t}\n\t\n\t\n\t/**\n\t * Determine current return class\n\t */\n\tprivate function searchReturnClass($a_class)\n\t{\n\t\t$a_class = strtolower($a_class);\n\n\t\t$node = $this->getNodeIdForTargetClass($this->current_node, $a_class);\n\t\t$node = $node[\"node_id\"];\n\t\t$n_arr = explode(\":\", $node);\n\t\tfor($i = count($n_arr)-2; $i>=0; $i--)\n\t\t{\n\t\t\tif ($this->return[$this->getClassForCid($n_arr[$i])] != \"\")\n\t\t\t{\n\t\t\t\treturn $this->getClassForCid($n_arr[$i]);\n\t\t\t}\n\t\t}\n\n\t\treturn false;\n\t}\n\n\t/**\n\t * Get URL parameters for a class and append them to a string\n\t */\n\tpublic function getUrlParameters($a_class, $a_str, $a_cmd = \"\", $xml_style = false)\n\t{\n\t\t// note: $a_class may be an array!\n\t\t//$a_class = strtolower($a_class);\n\n\t\t$params = $this->getParameterArrayByClass($a_class, $a_cmd);\n\n\t\tforeach ($params as $par => $value)\n\t\t{\n\t\t\tif (strlen((string) $value))\n\t\t\t{\n\t\t\t\t$a_str = ilUtil::appendUrlParameterString($a_str, $par.\"=\".$value, $xml_style);\n\t\t\t}\n\t\t}\n\n\t\treturn $a_str;\n\t}\n\n\t/**\n\t * Get all set/save parameters for a gui object\n\t */\n\tpublic function getParameterArray(&$a_gui_obj, $a_cmd = \"\")\n\t{\n\t\t$par_arr = $this->getParameterArrayByClass(strtolower(get_class($a_gui_obj)), $a_cmd);\n\n\t\treturn $par_arr;\n\t}\n\n\t/**\n\t * Get all set/save parameters using gui class name\n\t *\n\t * @param\tstring\t\tclass name\n\t * @param\tstring\t\tcmd\n\t $ @return\tarray\t\tparameter array\n\t */\n\tpublic function getParameterArrayByClass($a_class, $a_cmd = \"\")\n\t{\n\t\tif ($a_class == \"\")\n\t\t{\n\t\t\treturn array();\n\t\t}\n\n\t\tif (!is_array($a_class))\n\t\t{\n\t\t\t$a_class = array($a_class);\n\t\t}\n\n\t\t$nr = $this->current_node;\n\t\tforeach ($a_class as $class)\n\t\t{\n\t\t\t$class = strtolower($class);\n\t\t\t$nr = $this->getNodeIdForTargetClass($nr, $class);\n\t\t\tif ($nr[\"base_class\"] != \"\")\n\t\t\t{\n\t\t\t\t$new_baseclass = $nr[\"base_class\"];\n\t\t\t}\n\t\t\t$nr = $nr[\"node_id\"]; \n\t\t\t$target_class = $class;\n\t\t}\n\n\t\t$path = $this->getPathNew(1, $nr);\n\t\t$params = array();\n\n\t\t// append parameters of parent classes\n\t\tforeach($path as $node_id)\n\t\t{\n\t\t\t$class = ($node_id == \"\")\n\t\t\t\t? strtolower($_GET[\"baseClass\"])\n\t\t\t\t: $this->getClassForCid($this->getCurrentCidOfNode($node_id));\n\t\t\tif (isset($this->save_parameter[$class]) && is_array($this->save_parameter[$class]))\n\t\t\t{\n\t\t\t\tforeach($this->save_parameter[$class] as $par)\n\t\t\t\t{\n\t\t\t\t\tif (isset($_GET[$par]))\n\t\t\t\t\t{\n\t\t\t\t\t\t$params[$par] = $_GET[$par];\n\t\t\t\t\t}\n\t\t\t\t\telse if (isset($_POST[$par]))\n\t\t\t\t\t{\n\t\t\t\t\t\t$params[$par] = $_POST[$par];\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tif (isset($this->parameter[$class]) && is_array($this->parameter[$class]))\n\t\t\t{\n\t\t\t\tforeach($this->parameter[$class] as $par => $value)\n\t\t\t\t{\n\t\t\t\t\t$params[$par] = $value;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\n\t\tif ($a_cmd != \"\")\n\t\t{\n\t\t\t$params[\"cmd\"] = $a_cmd;\n\t\t}\n\n\t\t$params[\"cmdClass\"] = $target_class;\n\t\t$params[\"cmdNode\"] = $nr;\n\t\tif($new_baseclass == \"\")\n\t\t{\n\t\t\t$params[\"baseClass\"] = $_GET[\"baseClass\"];\n\t\t}\n\t\telse\n\t\t{\n\t\t\t$params[\"baseClass\"] = $new_baseclass;\n\t\t}\n\n\t\treturn $params;\n\t}\n\t\n\t/**\n\t * Get Cid for Class\n\t */\n\tprivate function getCidForClass($a_class, $a_check = false)\n\t{\n\t\tif ($this->class_cid[$a_class] == \"\")\n\t\t{\n\t\t\t$this->readClassInfo($a_class);\n\t\t}\n\t\tif ($this->class_cid[$a_class] == \"\")\n\t\t{\n\t\t\tif ($a_check)\n\t\t\t{\n\t\t\t\treturn false;\n\t\t\t}\n\t\t\tif (DEVMODE == 1)\n\t\t\t{\n\t\t\t\t$add = \"<br><br>Please make sure your GUI class name ends with 'GUI' and that the filename is 'class.[YourClassName].php'. In exceptional cases you\n\t\t\t\t\tmay solve the issue by putting an empty * @ilCtrl_Calls [YourClassName]: into your class header.\".\n\t\t\t\t\t\" In both cases you need to reload the control structure in the setup.\";\n\t\t\t}\n\t\t\tinclude_once(\"./Services/UICore/exceptions/class.ilCtrlException.php\");\n\t\t\tthrow new ilCtrlException(\"Cannot find cid for class \".$a_class.\".\".$add);\n\t\t}\n\t\treturn $this->class_cid[$a_class];\n\t}\n\n\t/**\n\t * Get class for cid\n\t */\n\tprivate function getClassForCid($a_cid)\n\t{\n\t\tif ($this->cid_class[$a_cid] == \"\")\n\t\t{\n\t\t\t$this->readCidInfo($a_cid);\n\t\t}\n\t\tif ($this->cid_class[$a_cid] == \"\")\n\t\t{\n\t\t\tinclude_once(\"./Services/UICore/exceptions/class.ilCtrlException.php\");\n\t\t\tthrow new ilCtrlException(\"Cannot find class for cid \".$a_cid.\".\");\n\t\t}\n\t\treturn $this->cid_class[$a_cid];\n\t}\n\n\t/**\n\t * Read information of class per cid\n\t * @return \n\t * @param object $a_cid\t\tcid\n\t */\n\tprivate function readCidInfo($a_cid)\n\t{\n\t\tglobal $ilDB;\n\t\t\n\t\tif (isset($this->info_read_cid[$a_cid]))\n\t\t{\n\t\t\treturn;\n\t\t}\n\t\t$set = $ilDB->query(\"SELECT * FROM ctrl_classfile \".\n\t\t\t\" WHERE cid = \".$ilDB->quote($a_cid, \"text\")\n\t\t\t);\n\t\tif ($rec  = $ilDB->fetchAssoc($set))\n\t\t{\n\t\t\t$this->cid_class[$a_cid] = $rec[\"class\"];\n\t\t\t$this->class_cid[$rec[\"class\"]] = $a_cid;\n\t\t\n\t\t\t$set = $ilDB->query(\"SELECT * FROM ctrl_calls \".\n\t\t\t\t\" WHERE parent = \".$ilDB->quote($rec[\"class\"], \"text\")\n\t\t\t\t);\n\t\t\twhile ($rec2  = $ilDB->fetchAssoc($set))\n\t\t\t{\n\t\t\t\tif (!isset($this->calls[$rec[\"class\"]]) || !is_array($this->calls[$rec[\"class\"]]) || !in_array($rec2[\"child\"], $this->calls[$rec[\"class\"]]))\n\t\t\t\t{\n\t\t\t\t\tif ($rec2[\"child\"] != \"\")\n\t\t\t\t\t{\n\t\t\t\t\t\t$this->calls[$rec[\"class\"]][] = $rec2[\"child\"];\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t\t$this->info_read_class[$rec[\"class\"]] = true;\n\t\t}\n\t\t\n\t\t$this->info_read_cid[$a_cid] = true;\n\t}\n\n\t/**\n\t * Read info of node\n\t *  \n\t * @param\tobject\t$a_class\tclass name\n\t */\n\tprivate function readNodeInfo($a_node)\n\t{\n\t\t$n_arr = explode(\":\", $a_node);\n\t\tforeach ($n_arr as $cid)\n\t\t{\n\t\t\t$this->readCidInfo($cid);\n\t\t}\n\t}\n\n\t/**\n\t * Read info of class\n\t *  \n\t * @param\tobject\t$a_class\tclass name\n\t */\n\tprivate function readClassInfo($a_class)\n\t{\n\t\tglobal $ilDB;\n\t\t\n\t\t$a_class = strtolower($a_class);\n\t\tif (isset($this->info_read_class[$a_class]))\n\t\t{\n\t\t\treturn;\n\t\t}\n\t\t$set = $ilDB->query(\"SELECT * FROM ctrl_classfile \".\n\t\t\t\" WHERE class = \".$ilDB->quote($a_class, \"text\")\n\t\t\t);\n\t\tif ($rec  = $ilDB->fetchAssoc($set))\n\t\t{\n\t\t\t$this->cid_class[$rec[\"cid\"]] = $a_class;\n\t\t\t$this->class_cid[$a_class] = $rec[\"cid\"];\n\t\t}\n\t\t\n\t\t$set = $ilDB->query(\"SELECT * FROM ctrl_calls \".\n\t\t\t\" WHERE parent = \".$ilDB->quote($a_class, \"text\")\n\t\t\t);\n\t\twhile ($rec  = $ilDB->fetchAssoc($set))\n\t\t{\n\t\t\tif (!isset($this->calls[$a_class]) || !is_array($this->calls[$a_class]) || !in_array($rec[\"child\"], $this->calls[$a_class]))\n\t\t\t{\n\t\t\t\tif ($rec[\"child\"] != \"\")\n\t\t\t\t{\n\t\t\t\t\t$this->calls[$a_class][] = $rec[\"child\"];\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\t\n\t\t$this->info_read_class[$a_class] = true;\n\t\t$this->info_read_cid[$this->class_cid[$a_class]] = true;\n\t}\n\n\t/**\n\t * Get last but one cid of node id\n\t */\n\tprivate function getParentCidOfNode($a_node)\n\t{\n\t\t$n_arr = explode(\":\", $a_node);\n\t\treturn $n_arr[count($n_arr) - 2];\n\t}\n\n\t/**\n\t * Remove last cid of node\n\t */\n\tprivate function removeLastCid($a_node)\n\t{\n\t\t$lpos = strrpos($a_node, \":\");\n\t\treturn substr($a_node, 0, $lpos);\n\t}\n\n\t/**\n\t * Get last cid of node id\n\t */\n\tprivate function getCurrentCidOfNode($a_node)\n\t{\n\t\t$n_arr = explode(\":\", $a_node);\n\t\treturn $n_arr[count($n_arr) - 1];\n\t}\n\n\t/**\n\t * Insert ctrl calls record\n\t *\n\t * @param\n\t * @return\n\t */\n\tfunction insertCtrlCalls($a_parent, $a_child, $a_comp_prefix)\n\t{\n\t\tglobal $ilDB;\n\n\t\t$a_parent = strtolower($a_parent);\n\t\t$a_child = strtolower($a_child);\n\t\t$a_comp_prefix = strtolower($a_comp_prefix);\n\n\t\t$set = $ilDB->query(\"SELECT * FROM ctrl_calls WHERE \".\n\t\t\t\" parent = \".$ilDB->quote($a_parent, \"text\").\" AND \".\n\t\t\t\" child = \".$ilDB->quote($a_child, \"text\").\" AND \".\n\t\t\t\" comp_prefix = \".$ilDB->quote($a_comp_prefix, \"text\")\n\t\t\t);\n\t\tif ($rec = $ilDB->fetchAssoc($set))\n\t\t{\n\t\t\treturn;\n\t\t}\n\t\t$ilDB->manipulate(\"INSERT INTO ctrl_calls \".\n\t\t\t\"(parent, child, comp_prefix) VALUES (\".\n\t\t\t$ilDB->quote($a_parent, \"text\").\",\".\n\t\t\t$ilDB->quote($a_child, \"text\").\",\".\n\t\t\t$ilDB->quote($a_comp_prefix, \"text\").\n\t\t\t\")\");\n\t}\n\n}\n?>\n
+===================================================================
+--- Services/UICore/classes/class.ilCtrl.php	(revision 56812)
++++ Services/UICore/classes/class.ilCtrl.php	(revision )
+@@ -1,6 +1,7 @@
+ <?php
+ /* Copyright (c) 1998-2012 ILIAS open source, Extended GPL, see docs/LICENSE */
+-
++require_once('class.ilCachedCtrl.php');
++require_once('./Services/Component/classes/class.ilCachedComponentData.php');
+ /**
+  * This class provides processing control methods.
+  * A global instance is available via variable $ilCtrl
+@@ -93,11 +94,13 @@
+ 		global $ilDB;
+ 		
+ 		$baseClass = strtolower($_GET["baseClass"]);
+-		
++
++		$module_class = ilCachedCtrl::getInstance();
++		$mc_rec = $module_class->lookupModuleClass($baseClass);
+ 		// get class information
+-		$mc_set = $ilDB->query("SELECT * FROM module_class WHERE LOWER(class) = ".
+-			$ilDB->quote($baseClass, "text"));
+-		$mc_rec = $ilDB->fetchAssoc($mc_set);
++//		$mc_set = $ilDB->query("SELECT * FROM module_class WHERE LOWER(class) = ".
++//			$ilDB->quote($baseClass, "text"));
++//		$mc_rec = $ilDB->fetchAssoc($mc_set);
+ 		$module = $mc_rec["module"];
+ 		$class = $mc_rec["class"];
+ 		$class_dir = $mc_rec["dir"];
+@@ -112,10 +115,12 @@
+ 		}
+ 		else		// check whether class belongs to a service
+ 		{
+-			$mc_set = $ilDB->query("SELECT * FROM service_class WHERE LOWER(class) = ".
+-				$ilDB->quote($baseClass, "text"));
+-			$mc_rec = $ilDB->fetchAssoc($mc_set);
++//			$mc_set = $ilDB->query("SELECT * FROM service_class WHERE LOWER(class) = ".
++//				$ilDB->quote($baseClass, "text"));
++//			$mc_rec = $ilDB->fetchAssoc($mc_set);
+ 
++			$mc_rec = $module_class->lookupServiceClass($baseClass);
++
+ 			$service = $mc_rec["service"];
+ 			$class = $mc_rec["class"];
+ 			$class_dir = $mc_rec["dir"];
+@@ -128,9 +133,13 @@
+ 			}
+ 
+ 			// get service information
+-			$m_set = $ilDB->query("SELECT * FROM il_component WHERE name = ".
+-				$ilDB->quote($service, "text"));
+-			$m_rec = $ilDB->fetchAssoc($m_set);
++//			$m_set = $ilDB->query("SELECT * FROM il_component WHERE name = ".
++//				$ilDB->quote($service, "text"));
++//			$m_rec = $ilDB->fetchAssoc($m_set);
++
++			$global_cache = ilCachedComponentData::getInstance();
++			$m_rec = $global_cache->lookupCompInfo('Services', $service);
++
+ 			$this->service_dir = $m_rec["type"]."/".$m_rec["name"];
+ 			
+ 			include_once $this->service_dir."/".$class_dir."/class.".$class.".php";;
+@@ -366,20 +375,27 @@
+ 		$n_class = "";
+ 		if ($a_class != "")
+ 		{
+-			global $ilDB;
+-			
+-			// get class information
+-			$mc_set = $ilDB->query("SELECT * FROM module_class WHERE LOWER(class) = ".
+-				$ilDB->quote($class, "text"));
+-			$mc_rec = $ilDB->fetchAssoc($mc_set);
++			$module_class = ilCachedCtrl::getInstance();
++			$mc_rec = $module_class->lookupModuleClass($class);
+ 			$n_class = strtolower($mc_rec["class"]);
+ 
++			global $ilDB;
++//
++//			// get class information
++//			$mc_set = $ilDB->query("SELECT * FROM module_class WHERE LOWER(class) = ".
++//				$ilDB->quote($class, "text"));
++//			$mc_rec = $ilDB->fetchAssoc($mc_set);
++//			$n_class = strtolower($mc_rec["class"]);
++
+ 			if ($n_class == "")
+ 			{
+-				$mc_set = $ilDB->query("SELECT * FROM service_class WHERE LOWER(class) = ".
+-					$ilDB->quote($class, "text"));
+-				$mc_rec = $ilDB->fetchAssoc($mc_set);
+-				$n_class = strtolower($mc_rec["class"]);
++				$mc_rec =  $module_class->lookupServiceClass($class);
++				$n_class = $mc_rec['lower_class'];
++
++//				$mc_set = $ilDB->query("SELECT * FROM service_class WHERE LOWER(class) = ".
++//					$ilDB->quote($class, "text"));
++//				$mc_rec = $ilDB->fetchAssoc($mc_set);
++//				$n_class = strtolower($mc_rec["class"]);
+ 			}
+ 			
+ 			if ($n_class != "")
+@@ -799,13 +815,16 @@
+ 	 */
+ 	function lookupClassPath($a_class_name)
+ 	{
+-		global $ilDB;
++//		global $ilDB;
+ 		$a_class_name = strtolower($a_class_name);
+ 
+-		$class_set = $ilDB->query("SELECT * FROM ctrl_classfile WHERE class = ".
+-			$ilDB->quote($a_class_name, "text"));
+-		$class_rec = $ilDB->fetchAssoc($class_set);
++		$cached_ctrl = ilCachedCtrl::getInstance();
++		$class_rec = $cached_ctrl->lookupClassFile($a_class_name);
+ 
++//		$class_set = $ilDB->query("SELECT * FROM ctrl_classfile WHERE class = ".
++//			$ilDB->quote($a_class_name, "text"));
++//		$class_rec = $ilDB->fetchAssoc($class_set);
++
+ 		if ($class_rec["plugin_path"] != "")
+ 		{
+ 			return $class_rec["plugin_path"]."/".$class_rec["filename"];
+@@ -1674,18 +1693,24 @@
+ 		{
+ 			return;
+ 		}
+-		$set = $ilDB->query("SELECT * FROM ctrl_classfile ".
+-			" WHERE cid = ".$ilDB->quote($a_cid, "text")
+-			);
+-		if ($rec  = $ilDB->fetchAssoc($set))
++
++		$cached_ctrl = ilCachedCtrl::getInstance();
++		$rec = $cached_ctrl->lookupCid($a_cid);
++
++//		$set = $ilDB->query("SELECT * FROM ctrl_classfile ".
++//			" WHERE cid = ".$ilDB->quote($a_cid, "text")
++//			);
++//		if ($rec  = $ilDB->fetchAssoc($set))
++		if($rec)
+ 		{
+ 			$this->cid_class[$a_cid] = $rec["class"];
+ 			$this->class_cid[$rec["class"]] = $a_cid;
+-		
+-			$set = $ilDB->query("SELECT * FROM ctrl_calls ".
+-				" WHERE parent = ".$ilDB->quote($rec["class"], "text")
+-				);
+-			while ($rec2  = $ilDB->fetchAssoc($set))
++			$calls = $cached_ctrl->lookupCall($rec["class"]);
++//			$set = $ilDB->query("SELECT * FROM ctrl_calls ".
++//				" WHERE parent = ".$ilDB->quote($rec["class"], "text")
++//				);
++//			while ($rec2  = $ilDB->fetchAssoc($set))
++			foreach($calls as $rec2)
+ 			{
+ 				if (!isset($this->calls[$rec["class"]]) || !is_array($this->calls[$rec["class"]]) || !in_array($rec2["child"], $this->calls[$rec["class"]]))
+ 				{
+@@ -1729,19 +1754,26 @@
+ 		{
+ 			return;
+ 		}
+-		$set = $ilDB->query("SELECT * FROM ctrl_classfile ".
+-			" WHERE class = ".$ilDB->quote($a_class, "text")
+-			);
+-		if ($rec  = $ilDB->fetchAssoc($set))
++
++		$cached_ctrl = ilCachedCtrl::getInstance();
++		$rec = $cached_ctrl->lookupClassFile($a_class);
++
++//		$set = $ilDB->query("SELECT * FROM ctrl_classfile ".
++//			" WHERE class = ".$ilDB->quote($a_class, "text")
++//			);
++//		if ($rec  = $ilDB->fetchAssoc($set))
++		if($rec)
+ 		{
+ 			$this->cid_class[$rec["cid"]] = $a_class;
+ 			$this->class_cid[$a_class] = $rec["cid"];
+ 		}
+ 		
+-		$set = $ilDB->query("SELECT * FROM ctrl_calls ".
+-			" WHERE parent = ".$ilDB->quote($a_class, "text")
+-			);
+-		while ($rec  = $ilDB->fetchAssoc($set))
++//		$set = $ilDB->query("SELECT * FROM ctrl_calls ".
++//			" WHERE parent = ".$ilDB->quote($a_class, "text")
++//			);
++		$recs = $cached_ctrl->lookupCall($a_class);
++//		while ($rec  = $ilDB->fetchAssoc($set))
++		foreach($recs as $rec)
+ 		{
+ 			if (!isset($this->calls[$a_class]) || !is_array($this->calls[$a_class]) || !in_array($rec["child"], $this->calls[$a_class]))
+ 			{
